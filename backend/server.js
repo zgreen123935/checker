@@ -7,6 +7,10 @@ const path = require('path');
 const fs = require('fs').promises;
 const { OpenAI } = require('openai');
 
+// Load prompts configuration
+const promptsPath = path.join(__dirname, 'prompts', 'thermostat-analysis.json');
+const prompts = JSON.parse(fs.readFileSync(promptsPath, 'utf8'));
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -90,28 +94,16 @@ app.post('/api/analyze', upload.array('images', 2), async (req, res) => {
 
         // Process images with OpenAI Vision API
         const imageAnalyses = await Promise.all(files.map(async (file) => {
-            const imageData = await fs.readFile(file.path, { encoding: 'base64' });
+            const imageBase64 = file.buffer.toString('base64');
             
+            // Use prompts from config file
+            const messages = JSON.parse(JSON.stringify(prompts.imageAnalysis.messages));
+            messages[1].content[1].image_url.url = `data:${file.mimetype};base64,${imageBase64}`;
+
             const response = await openai.chat.completions.create({
-                model: "gpt-4-turbo",
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            {
-                                type: "text",
-                                text: "Analyze this thermostat image. First, describe what you see in detail. Then tell me: 1) What type/model of thermostat it is, 2) Whether it's likely compatible with Mysa's smart thermostats, 3) What's your confidence level in this assessment, and 4) Any specific recommendations or concerns for installation."
-                            },
-                            {
-                                type: "image_url",
-                                image_url: {
-                                    url: `data:${file.mimetype};base64,${imageData}`
-                                }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens: 1000
+                model: prompts.imageAnalysis.model,
+                messages: messages,
+                max_tokens: prompts.imageAnalysis.max_tokens
             });
 
             return response.choices[0].message.content;

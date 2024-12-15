@@ -134,11 +134,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added version.json for build tracking
   - New /api/version endpoint
   - Build date and environment info
+- Prompt Configuration:
+  - New prompts directory with JSON configuration
+  - Structured image analysis prompts
+  - Compatibility guidelines and requirements
+  - System type definitions
 
 ### Changed
 - Enhanced AI prompts:
   - Added detailed image description request
   - Increased token limit for more comprehensive analysis
+  - Moved prompts to dedicated configuration file
 - UI Improvements:
   - Added collapsible dev panel
   - Better formatting for raw analysis display
