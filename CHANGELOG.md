@@ -121,6 +121,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Development branch setup
 - Automated deployment workflow
 
+## [0.2.2] - 2024-12-14
+
+### Added
+- Developer features:
+  - New Dev Info button in UI
+  - Version information display
+  - Raw AI analysis view
+  - Debug information panel
+  - Processing time metrics
+- Version tracking:
+  - Added version.json for build tracking
+  - New /api/version endpoint
+  - Build date and environment info
+
+### Changed
+- Enhanced AI prompts:
+  - Added detailed image description request
+  - Increased token limit for more comprehensive analysis
+- UI Improvements:
+  - Added collapsible dev panel
+  - Better formatting for raw analysis display
+  - Structured debug information presentation
+
+## [0.2.1] - 2024-12-14
+
+### Changed
+- Updated OpenAI integration:
+  - Migrated from deprecated gpt-4-vision-preview to gpt-4-turbo model
+  - Improved system prompts for better JSON formatting
+  - Added natural language responses alongside structured data
+
+### Added
+- Enhanced error handling:
+  - JSON validation and fallback values
+  - Detailed error logging
+  - Graceful degradation for parsing failures
+  - Field validation for analysis results
+
+### Fixed
+- JSON parsing issues in OpenAI responses
+- Response format compatibility with GPT-4 Turbo
+- Frontend display of detailed analysis text
+
+## [0.2.0] - 2024-12-14
+
+### Added
+- Backend improvements:
+  - File validation for type (JPG, PNG, HEIC) and size (5MB limit)
+  - Automatic file cleanup after processing
+  - Health check endpoint (`/api/health`)
+  - Environment-aware error details
+  - Error handling middleware for multer errors
+  - Required dependencies: express, cors, multer, openai, dotenv
+  - Uploads directory for file handling
+
+- Frontend enhancements:
+  - Drag and drop file upload support
+  - Image preview functionality
+  - File validation on client side
+  - Loading states and improved error feedback
+  - Ability to remove selected files
+  - Enhanced analysis results display
+  - Improved UI components and organization
+
+### Changed
+- Refactored server.js for better error handling and organization
+- Updated ImageUpload component with modern UI patterns
+- Improved error messages for better user experience
+- Moved environment configuration to backend directory
+- Updated port configuration for development environment
+
+### Fixed
+- Port conflicts resolution for development servers
+- Environment variable loading in backend
+- File upload directory structure
+
 ## [0.1.0] - 2024-12-14
 ### Initial Release
 - Basic functionality for HVAC compatibility checking
