@@ -121,6 +121,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Development branch setup
 - Automated deployment workflow
 
+## [0.2.3] - 2024-12-14
+
+### Enhanced
+- Analysis Prompts:
+  - Added structured component description format
+  - Improved wiring identification guidance
+  - Enhanced voltage verification steps
+  - Expanded C-wire analysis instructions
+  - Added detailed HVAC system type classification
+  - Updated terminal labeling and wire color guidance
+  - Included accessory identification steps
+
+### Changed
+- OpenAI Prompts:
+  - Reorganized analysis steps for better clarity
+  - Added more specific guidance for each analysis component
+  - Enhanced formatting for better readability
+  - Updated system identification criteria
+
 ## [0.2.2] - 2024-12-14
 
 ### Added
@@ -134,11 +153,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added version.json for build tracking
   - New /api/version endpoint
   - Build date and environment info
+- Prompt Configuration:
+  - New prompts directory with JSON configuration
+  - Structured image analysis prompts
+  - Compatibility guidelines and requirements
+  - System type definitions
 
 ### Changed
 - Enhanced AI prompts:
   - Added detailed image description request
   - Increased token limit for more comprehensive analysis
+  - Moved prompts to dedicated configuration file
 - UI Improvements:
   - Added collapsible dev panel
   - Better formatting for raw analysis display

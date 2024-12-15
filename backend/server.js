@@ -1,11 +1,15 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
+require('dotenv').config();
 const { OpenAI } = require('openai');
+
+// Load prompts configuration
+const promptsPath = path.join(__dirname, 'prompts', 'thermostat-analysis.json');
+const prompts = JSON.parse(fs.readFileSync(promptsPath, 'utf8'));
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,7 +55,7 @@ const openai = new OpenAI({
 const cleanupFiles = async (files) => {
     try {
         for (const file of files) {
-            await fs.unlink(file.path);
+            await fs.promises.unlink(file.path);
         }
     } catch (error) {
         console.error('Error cleaning up files:', error);
@@ -61,7 +65,7 @@ const cleanupFiles = async (files) => {
 // Version info endpoint
 app.get('/api/version', async (req, res) => {
     try {
-        const versionData = await fs.readFile(path.join(__dirname, '..', 'version.json'), 'utf8');
+        const versionData = await fs.promises.readFile(path.join(__dirname, '..', 'version.json'), 'utf8');
         res.json(JSON.parse(versionData));
     } catch (error) {
         res.status(500).json({ error: 'Could not read version info' });
@@ -69,147 +73,86 @@ app.get('/api/version', async (req, res) => {
 });
 
 // Routes
-app.post('/api/analyze', upload.array('images', 2), async (req, res) => {
+app.post('/api/analyze', upload.array('images', 5), async (req, res) => {
     try {
         const files = req.files;
-        
         if (!files || files.length === 0) {
-            return res.status(400).json({ 
-                error: 'No images uploaded',
-                details: 'Please upload at least one image of your thermostat.'
-            });
-        }
-
-        if (files.length > 2) {
-            await cleanupFiles(files);
-            return res.status(400).json({ 
-                error: 'Too many files',
-                details: 'Maximum of 2 images allowed.'
-            });
+            return res.status(400).json({ error: 'No image files provided' });
         }
 
         // Process images with OpenAI Vision API
         const imageAnalyses = await Promise.all(files.map(async (file) => {
-            const imageData = await fs.readFile(file.path, { encoding: 'base64' });
+            // Read file buffer
+            const imageBuffer = await fs.promises.readFile(file.path);
+            const imageBase64 = imageBuffer.toString('base64');
             
+            // Use prompts from config file
+            const messages = JSON.parse(JSON.stringify(prompts.imageAnalysis.messages));
+            messages[1].content[1].image_url.url = `data:${file.mimetype};base64,${imageBase64}`;
+
             const response = await openai.chat.completions.create({
-                model: "gpt-4-turbo",
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            {
-                                type: "text",
-                                text: "Analyze this thermostat image. First, describe what you see in detail. Then tell me: 1) What type/model of thermostat it is, 2) Whether it's likely compatible with Mysa's smart thermostats, 3) What's your confidence level in this assessment, and 4) Any specific recommendations or concerns for installation."
-                            },
-                            {
-                                type: "image_url",
-                                image_url: {
-                                    url: `data:${file.mimetype};base64,${imageData}`
-                                }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens: 1000
+                model: prompts.imageAnalysis.model,
+                messages: messages,
+                max_tokens: prompts.imageAnalysis.max_tokens
             });
 
-            return response.choices[0].message.content;
-        }));
+            // Process results summary
+            const analysis = response.choices[0].message.content;
+            const summaryMessages = JSON.parse(JSON.stringify(prompts.resultsSummary.messages));
+            summaryMessages[1].content = analysis;
 
-        // Process the API responses
-        const combinedAnalysis = imageAnalyses.join('\n\n');
-        
-        // Extract key information using another GPT call
-        const analysisResponse = await openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [
-                {
-                    role: "system",
-                    content: `You are a thermostat compatibility analyzer. Analyze the thermostat description and provide two things:
-1. A natural language explanation of the compatibility
-2. A JSON object with the following structure (ensure it's valid JSON with double quotes):
-{
-    "thermostatType": "type of thermostat",
-    "compatibility": "Compatible/Not Compatible/Uncertain",
-    "confidence": 0.95,
-    "recommendations": ["recommendation 1", "recommendation 2"]
-}
-Always include the JSON object at the end of your response, separated by a newline.`
-                },
-                {
-                    role: "user",
-                    content: combinedAnalysis
-                }
-            ],
-            max_tokens: 1000
-        });
+            const summaryResponse = await openai.chat.completions.create({
+                model: prompts.resultsSummary.model,
+                messages: summaryMessages,
+                max_tokens: prompts.resultsSummary.max_tokens
+            });
 
-        const fullResponse = analysisResponse.choices[0].message.content;
-        
-        // Extract JSON from the response by finding the last occurrence of a JSON-like structure
-        const jsonMatch = fullResponse.match(/\{[\s\S]*\}/g);
-        let analysis;
-        
-        if (jsonMatch) {
+            const summary = summaryResponse.choices[0].message.content;
+
+            // Extract JSON from summary
+            let compatibilityData = {};
             try {
-                // Get the last match (in case there are multiple JSON structures)
-                const lastJson = jsonMatch[jsonMatch.length - 1];
-                analysis = JSON.parse(lastJson);
-                
-                // Validate the required fields
-                if (!analysis.thermostatType || !analysis.compatibility || 
-                    !analysis.confidence || !Array.isArray(analysis.recommendations)) {
-                    throw new Error('Invalid analysis structure');
+                const jsonMatch = summary.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    compatibilityData = JSON.parse(jsonMatch[0]);
                 }
-                
-                // Ensure confidence is a number between 0 and 1
-                analysis.confidence = parseFloat(analysis.confidence);
-                if (isNaN(analysis.confidence)) {
-                    analysis.confidence = 0.5; // Default to 50% if invalid
-                }
-            } catch (err) {
-                console.error('Error parsing JSON from response:', err);
-                console.error('Response content:', fullResponse);
-                
-                // Create a fallback analysis
-                analysis = {
+            } catch (error) {
+                console.error('Error parsing compatibility JSON:', error);
+                compatibilityData = {
                     thermostatType: "Unknown",
                     compatibility: "Uncertain",
-                    confidence: 0.5,
-                    recommendations: ["Could not determine compatibility with certainty", "Please contact support for manual verification"]
+                    confidence: 0,
+                    recommendations: ["Error processing results"]
                 };
             }
-        } else {
-            console.error('No JSON found in response:', fullResponse);
-            throw new Error('Could not extract analysis results');
-        }
 
-        // Clean up files after processing
+            return {
+                analysis,
+                summary,
+                compatibility: compatibilityData,
+                debug: {
+                    timestamp: new Date().toISOString(),
+                    model: prompts.imageAnalysis.model,
+                    processingTime: Date.now() - req.startTime
+                }
+            };
+        }));
+
+        // Cleanup temporary files
         await cleanupFiles(files);
 
-        // Send both the structured analysis and full response
         res.json({
-            ...analysis,
-            fullAnalysis: fullResponse.replace(jsonMatch[jsonMatch.length - 1], '').trim(),
-            rawAnalyses: imageAnalyses,
-            debug: process.env.NODE_ENV === 'development' ? {
-                timestamp: new Date().toISOString(),
-                processingTime: Date.now() - req.startTime,
-                imageCount: files.length,
-            } : undefined
+            results: imageAnalyses,
+            count: imageAnalyses.length,
+            totalProcessingTime: Date.now() - req.startTime
         });
     } catch (error) {
-        // Clean up files if there's an error
+        console.error('Error analyzing images:', error);
+        // Cleanup files even if there's an error
         if (req.files) {
             await cleanupFiles(req.files);
         }
-
-        console.error('Error processing request:', error);
-        res.status(500).json({ 
-            error: 'Error analyzing images',
-            details: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred.'
-        });
+        res.status(500).json({ error: 'Error analyzing images', details: error.message });
     }
 });
 
