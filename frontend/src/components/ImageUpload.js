@@ -145,73 +145,85 @@ const ImageUpload = () => {
                 )}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <div 
-                    className="flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg border-muted hover:border-muted-foreground/50 transition-colors relative"
-                    onDrop={dropHandler}
-                    onDragOver={dragOverHandler}
-                >
-                    <div className="flex flex-col items-center justify-center space-y-4">
-                        <div className="p-4 bg-secondary rounded-full">
-                            <ImagePlus className="w-8 h-8 text-muted-foreground" />
+            {!loading && !analysis && (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div 
+                        className="flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg border-muted hover:border-muted-foreground/50 transition-colors relative"
+                        onDrop={dropHandler}
+                        onDragOver={dragOverHandler}
+                    >
+                        <div className="flex flex-col items-center justify-center space-y-4">
+                            <div className="p-4 bg-secondary rounded-full">
+                                <ImagePlus className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                            <div className="space-y-2 text-center">
+                                <p className="text-sm text-muted-foreground">
+                                    Drag and drop your images here, or click to select files
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Supported formats: JPG, PNG, HEIC (max 5MB each)
+                                </p>
+                            </div>
+                            <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
                         </div>
-                        <div className="space-y-2 text-center">
-                            <p className="text-sm text-muted-foreground">
-                                Drag and drop your images here, or click to select files
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                Supported formats: JPG, PNG, HEIC (max 5MB each)
-                            </p>
+                    </div>
+
+                    {previews.length > 0 && (
+                        <div className="space-y-4">
+                            <h3 className="font-medium">Selected Files:</h3>
+                            <div className="grid grid-cols-1 gap-4">
+                                {previews.map((preview, index) => (
+                                    <div key={index} className="relative">
+                                        <img 
+                                            src={preview} 
+                                            alt={`Preview ${index + 1}`}
+                                            className="w-full h-auto object-contain rounded-lg"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFile(index)}
+                                            className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <input
-                            type="file"
-                            multiple
-                            accept="image/*"
-                            onChange={handleFileChange}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
+                    )}
+
+                    <Button
+                        type="submit"
+                        disabled={files.length === 0}
+                        className="w-full"
+                    >
+                        Check Compatibility
+                    </Button>
+                </form>
+            )}
+
+            {loading && (
+                <div className="analyzing-container">
+                    <div className="space-y-4">
+                        {previews.map((preview, index) => (
+                            <img 
+                                key={index}
+                                src={preview} 
+                                alt={`Analyzing ${index + 1}`}
+                                className="image-preview-large"
+                            />
+                        ))}
+                        <div className="analyzing-text">Analyzing your thermostat...</div>
+                        <div className="analyzing-bar"></div>
                     </div>
                 </div>
-
-                {previews.length > 0 && (
-                    <div className="space-y-4">
-                        <h3 className="font-medium">Selected Files:</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {previews.map((preview, index) => (
-                                <div key={index} className="relative">
-                                    <img 
-                                        src={preview} 
-                                        alt={`Preview ${index + 1}`}
-                                        className="w-full h-48 object-cover rounded-lg"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => removeFile(index)}
-                                        className="absolute -top-2 -right-2 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <Button
-                    type="submit"
-                    disabled={files.length === 0 || loading}
-                    className="w-full"
-                >
-                    {loading ? (
-                        <span className="flex items-center space-x-2">
-                            <Upload className="w-4 h-4 animate-spin" />
-                            <span>Analyzing...</span>
-                        </span>
-                    ) : (
-                        'Check Compatibility'
-                    )}
-                </Button>
-            </form>
+            )}
 
             {error && (
                 <div className="p-4 text-sm text-destructive-foreground bg-destructive/10 rounded-lg">
@@ -220,54 +232,64 @@ const ImageUpload = () => {
             )}
 
             {analysis && (
-                <div className="space-y-4 p-6 bg-card text-card-foreground rounded-lg shadow-sm">
-                    <h3 className="text-lg font-semibold">Analysis Results</h3>
-                    {analysis.results && analysis.results.map((result, index) => (
-                        <div key={index} className="space-y-4">
-                            {index > 0 && <hr className="border-t border-border" />}
-                            <div className="space-y-2">
-                                <p><span className="font-medium">Thermostat Type:</span> {result.compatibility.thermostatType}</p>
-                                <p><span className="font-medium">Compatibility:</span> {result.compatibility.compatibility}</p>
-                                <p><span className="font-medium">Confidence:</span> {(result.compatibility.confidence * 100).toFixed(1)}%</p>
-                            </div>
-                            {result.compatibility.recommendations && (
-                                <div className="space-y-2">
-                                    <h4 className="font-medium">Recommendations:</h4>
-                                    <ul className="list-disc list-inside space-y-1">
-                                        {result.compatibility.recommendations.map((rec, recIndex) => (
-                                            <li key={recIndex} className="text-sm text-muted-foreground">
-                                                {rec}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                            {result.summary && (
-                                <div className="mt-4 pt-4 border-t border-border">
-                                    <h4 className="font-medium mb-2">Summary:</h4>
-                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                        {result.summary}
-                                    </p>
-                                </div>
-                            )}
-                            {showDevInfo && (
-                                <div className="mt-4 pt-4 border-t border-border">
-                                    <h4 className="font-medium mb-2">Raw Analysis:</h4>
-                                    <div className="text-sm bg-muted p-4 rounded-lg">
-                                        <pre className="whitespace-pre-wrap text-muted-foreground">
-                                            {result.analysis}
-                                        </pre>
-                                    </div>
-                                    <div className="mt-4">
-                                        <h5 className="font-medium mb-2">Debug Info:</h5>
-                                        <pre className="text-sm text-muted-foreground">
-                                            {JSON.stringify(result.debug, null, 2)}
-                                        </pre>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                <div className="space-y-4">
+                    {previews.map((preview, index) => (
+                        <img 
+                            key={index}
+                            src={preview} 
+                            alt={`Analysis ${index + 1}`}
+                            className="image-preview-large"
+                        />
                     ))}
+                    <div className="p-6 bg-card text-card-foreground rounded-lg shadow-sm">
+                        <h3 className="text-lg font-semibold">Analysis Results</h3>
+                        {analysis.results && analysis.results.map((result, index) => (
+                            <div key={index} className="space-y-4">
+                                {index > 0 && <hr className="border-t border-border" />}
+                                <div className="space-y-2">
+                                    <p><span className="font-medium">Thermostat Type:</span> {result.compatibility.thermostatType}</p>
+                                    <p><span className="font-medium">Compatibility:</span> {result.compatibility.compatibility}</p>
+                                    <p><span className="font-medium">Confidence:</span> {(result.compatibility.confidence * 100).toFixed(1)}%</p>
+                                </div>
+                                {result.compatibility.recommendations && (
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium">Recommendations:</h4>
+                                        <ul className="list-disc list-inside space-y-1">
+                                            {result.compatibility.recommendations.map((rec, recIndex) => (
+                                                <li key={recIndex} className="text-sm text-muted-foreground">
+                                                    {rec}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {result.summary && (
+                                    <div className="mt-4 pt-4 border-t border-border">
+                                        <h4 className="font-medium mb-2">Summary:</h4>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                            {result.summary}
+                                        </p>
+                                    </div>
+                                )}
+                                {showDevInfo && (
+                                    <div className="mt-4 pt-4 border-t border-border">
+                                        <h4 className="font-medium mb-2">Raw Analysis:</h4>
+                                        <div className="text-sm bg-muted p-4 rounded-lg">
+                                            <pre className="whitespace-pre-wrap text-muted-foreground">
+                                                {result.analysis}
+                                            </pre>
+                                        </div>
+                                        <div className="mt-4">
+                                            <h5 className="font-medium mb-2">Debug Info:</h5>
+                                            <pre className="text-sm text-muted-foreground">
+                                                {JSON.stringify(result.debug, null, 2)}
+                                            </pre>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
                     {showDevInfo && (
                         <div className="mt-4 pt-4 border-t border-border">
                             <h4 className="font-medium mb-2">Response Overview:</h4>
@@ -277,6 +299,17 @@ const ImageUpload = () => {
                             </pre>
                         </div>
                     )}
+                    <Button
+                        onClick={() => {
+                            setFiles([]);
+                            setPreviews([]);
+                            setAnalysis(null);
+                            setError(null);
+                        }}
+                        className="w-full"
+                    >
+                        Analyze Another Thermostat
+                    </Button>
                 </div>
             )}
         </div>
