@@ -1,0 +1,19 @@
+:root {
+  /* Base spacing unit */
+  --spacing-unit: 0.25rem;
+
+  /* Spacing scale */
+  --spacing-xs: calc(var(--spacing-unit) * 2);    /* 0.5rem */
+  --spacing-sm: calc(var(--spacing-unit) * 4);    /* 1rem */
+  --spacing-md: calc(var(--spacing-unit) * 6);    /* 1.5rem */
+  --spacing-lg: calc(var(--spacing-unit) * 8);    /* 2rem */
+  --spacing-xl: calc(var(--spacing-unit) * 10);   /* 2.5rem */
+  --spacing-2xl: calc(var(--spacing-unit) * 12);  /* 3rem */
+  --spacing-3xl: calc(var(--spacing-unit) * 16);  /* 4rem */
+
+  /* Component-specific spacing */
+  --container-padding-x: var(--spacing-xl);
+  --container-padding-y: var(--spacing-2xl);
+  --content-spacing: var(--spacing-xl);
+  --step-indicator-spacing: var(--spacing-xl);
+}

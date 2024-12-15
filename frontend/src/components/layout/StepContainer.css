@@ -1,0 +1,18 @@
+.step-container {
+  position: relative;
+  flex: 1;
+  background: var(--color-background);
+  border-radius: 16px;
+  padding: var(--container-padding-y) var(--container-padding-x);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  display: flex;
+  flex-direction: column;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+  .step-container {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+}

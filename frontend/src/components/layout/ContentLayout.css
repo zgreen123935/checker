@@ -1,0 +1,11 @@
+.content-layout {
+  margin-top: var(--content-spacing);
+}
+
+.content-layout.spacing-large {
+  margin-top: var(--spacing-2xl);
+}
+
+.content-layout.spacing-small {
+  margin-top: var(--spacing-md);
+}

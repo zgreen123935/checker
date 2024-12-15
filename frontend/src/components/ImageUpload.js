@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Button } from './ui/button';
-import { Upload, ImagePlus, X, Code } from 'lucide-react';
+import { Upload, ImagePlus, X, Code, ArrowLeft, ExternalLink } from 'lucide-react';
+import '../App.css';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/heic'];
@@ -14,6 +15,9 @@ const ImageUpload = () => {
     const [error, setError] = useState(null);
     const [showDevInfo, setShowDevInfo] = useState(false);
     const [versionInfo, setVersionInfo] = useState(null);
+    const [showPhoto, setShowPhoto] = useState(false);
+    const [view, setView] = useState('upload'); // 'upload', 'analyzing', 'results'
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         // Fetch version info on component mount
@@ -80,6 +84,7 @@ const ImageUpload = () => {
         if (files.length === 0) return;
 
         setLoading(true);
+        setView('analyzing');
         setError(null);
         setAnalysis(null);
 
@@ -94,13 +99,31 @@ const ImageUpload = () => {
                     'Content-Type': 'multipart/form-data',
                 },
             });
-            setAnalysis(response.data);
+            
+            // Store the full response for debugging
+            const result = response.data.results[0];
+            setAnalysis({
+                ...result.compatibility,
+                rawResponse: response.data
+            });
+            setView('results');
+            setShowPhoto(false);
         } catch (err) {
             setError(err.response?.data?.details || err.message || 'Error analyzing images. Please try again.');
+            setView('upload');
             console.error('Error:', err);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleStartOver = () => {
+        setFiles([]);
+        setPreviews([]);
+        setAnalysis(null);
+        setError(null);
+        setView('upload');
+        setShowPhoto(false);
     };
 
     const dropHandler = useCallback((e) => {
@@ -117,199 +140,271 @@ const ImageUpload = () => {
         e.stopPropagation();
     }, []);
 
-    return (
-        <div className="max-w-2xl mx-auto p-6 space-y-8">
-            <div className="text-center space-y-4">
-                <div className="flex justify-between items-center">
-                    <h2 className="text-3xl font-bold tracking-tight">HVAC Compatibility Checker</h2>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowDevInfo(!showDevInfo)}
-                        className="flex items-center gap-2"
-                    >
-                        <Code className="w-4 h-4" />
-                        Dev Info
-                    </Button>
-                </div>
-                <p className="text-muted-foreground">
-                    Upload images of your thermostat to check compatibility
-                </p>
-                {showDevInfo && versionInfo && (
-                    <div className="text-left p-4 bg-muted rounded-lg text-sm">
-                        <h3 className="font-medium mb-2">Version Information</h3>
-                        <pre className="whitespace-pre-wrap">
-                            {JSON.stringify(versionInfo, null, 2)}
-                        </pre>
-                    </div>
-                )}
-            </div>
-
-            {!loading && !analysis && (
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div 
-                        className="flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg border-muted hover:border-muted-foreground/50 transition-colors relative"
-                        onDrop={dropHandler}
-                        onDragOver={dragOverHandler}
-                    >
-                        <div className="flex flex-col items-center justify-center space-y-4">
-                            <div className="p-4 bg-secondary rounded-full">
-                                <ImagePlus className="w-8 h-8 text-muted-foreground" />
-                            </div>
-                            <div className="space-y-2 text-center">
-                                <p className="text-sm text-muted-foreground">
-                                    Drag and drop your images here, or click to select files
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Supported formats: JPG, PNG, HEIC (max 5MB each)
-                                </p>
-                            </div>
-                            <input
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                onChange={handleFileChange}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+    const renderContent = () => {
+        switch (view) {
+            case 'analyzing':
+                return (
+                    <div className="bordered-container">
+                        <div className="step-indicator">Step 2/3</div>
+                        <h2 className="section-title">Analyzing Your Photo</h2>
+                        <p className="section-description">
+                            Please wait while we analyze your thermostat's wiring configuration...
+                        </p>
+                        <div className="preview-large">
+                            <img 
+                                src={previews[0]} 
+                                alt="Thermostat wiring"
+                                className="preview-image-large"
                             />
+                            <div className="scanning-line" />
                         </div>
                     </div>
+                );
 
-                    {previews.length > 0 && (
-                        <div className="space-y-4">
-                            <h3 className="font-medium">Selected Files:</h3>
-                            <div className="grid grid-cols-1 gap-4">
-                                {previews.map((preview, index) => (
-                                    <div key={index} className="relative">
-                                        <img 
-                                            src={preview} 
-                                            alt={`Preview ${index + 1}`}
-                                            className="w-full h-auto object-contain rounded-lg"
+            case 'results':
+                return (
+                    <div className="bordered-container results-container">
+                        <div className="step-indicator">Step 3/3</div>
+                        <div className="results-header">
+                            <h2 className="section-title">Analysis Results</h2>
+                            <div className="flex gap-2">
+                                {previews[0] && (
+                                    <button
+                                        onClick={() => setShowPhoto(!showPhoto)}
+                                        className="button btn-outline"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {showPhoto ? (
+                                                <>
+                                                    <X className="w-4 h-4" />
+                                                    <span>Hide Thermostat</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ArrowLeft className="w-4 h-4" />
+                                                    <span>Show Thermostat</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setShowDevInfo(!showDevInfo)}
+                                    className="button btn-outline"
+                                >
+                                    <Code className="w-4 h-4 mr-2" />
+                                    <span>Debug Info</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {showPhoto && previews[0] && (
+                            <div className="photo-preview">
+                                <img 
+                                    src={previews[0]} 
+                                    alt="Thermostat wiring"
+                                    className="preview-image-large"
+                                />
+                            </div>
+                        )}
+
+                        <div className="results-content">
+                            <div className="result-group">
+                                <div className="result-item">
+                                    <h3 className="result-label">Thermostat Type</h3>
+                                    <p className="result-value">
+                                        {analysis.thermostatType || 'Not identifiable from information provided'}
+                                    </p>
+                                </div>
+
+                                <div className="result-item">
+                                    <h3 className="result-label">Compatibility</h3>
+                                    <p className={`result-value ${analysis.compatibility === 'Compatible' ? 'text-success' : 'text-error'}`}>
+                                        {analysis.compatibility || 'Unknown'}
+                                    </p>
+                                </div>
+
+                                <div className="result-item">
+                                    <h3 className="result-label">Confidence</h3>
+                                    <p className="result-value">
+                                        {analysis.confidence ? `${analysis.confidence}%` : 'N/A'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {analysis.recommendations && analysis.recommendations.length > 0 && (
+                                <div className="recommendations-section">
+                                    <h3 className="result-label">Recommendations</h3>
+                                    <ul className="recommendations-list">
+                                        {analysis.recommendations.map((rec, index) => (
+                                            <li key={index} className="recommendation-item">{rec}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {showDevInfo && (
+                                <div className="debug-info mt-4">
+                                    <h3 className="font-bold mb-2">Raw API Response:</h3>
+                                    <pre className="bg-gray-100 p-4 rounded-lg overflow-auto max-h-96">
+                                        {JSON.stringify(analysis.rawResponse, null, 2)}
+                                    </pre>
+                                </div>
+                            )}
+
+                            <div className="action-buttons">
+                                <button
+                                    onClick={handleStartOver}
+                                    className="button btn-outline"
+                                >
+                                    <ArrowLeft className="w-4 h-4" />
+                                    <span>Start Over</span>
+                                </button>
+                                <a
+                                    href="https://shop.getmysa.com/products/mysa-v2"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="button btn-primary-black"
+                                >
+                                    <span>Shop Now</span>
+                                    <ExternalLink className="w-4 h-4" />
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            default: // 'upload'
+                return (
+                    <div className="bordered-container">
+                        <div className="step-indicator">Step 1/3</div>
+                        <div className="content-wrapper">
+                            <h1 className="section-title">Upload Your Thermostat Photo</h1>
+                            <p className="section-description">
+                                Take a clear photo of your thermostat's wiring setup to check compatibility.
+                            </p>
+                        </div>
+
+                        {previews.length > 0 ? (
+                            <div className="preview-container">
+                                <div className="preview-section">
+                                    <div className="preview-large">
+                                        <img
+                                            src={previews[0]}
+                                            alt="Selected thermostat"
+                                            className="preview-image-large"
                                         />
                                         <button
                                             type="button"
-                                            onClick={() => removeFile(index)}
-                                            className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeFile(0);
+                                            }}
+                                            className="remove-button-large"
+                                            aria-label="Remove image"
                                         >
                                             <X className="w-4 h-4" />
                                         </button>
+                                        {view === 'analyzing' && <div className="scanning-line" />}
                                     </div>
-                                ))}
+                                    
+                                    <div className="thumbnails-container">
+                                        <div className="thumbnail-item">
+                                            <img 
+                                                src={previews[0]} 
+                                                alt="Thumbnail 1"
+                                                className="thumbnail-image"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeFile(0);
+                                                }}
+                                                className="remove-button-thumbnail"
+                                                aria-label="Remove image"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <div 
+                                            className="thumbnail-upload"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                fileInputRef.current?.click();
+                                            }}
+                                        >
+                                            <ImagePlus className="w-6 h-6" />
+                                            <span>Add Photo</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="action-section">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleSubmit(e);
+                                        }}
+                                        disabled={loading}
+                                        className="button btn-primary-black"
+                                    >
+                                        {loading ? 'Analyzing...' : 'Check Compatibility'}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <>
+                                <div
+                                    className="upload-area"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onDrop={dropHandler}
+                                    onDragOver={dragOverHandler}
+                                >
+                                    <ImagePlus className="upload-icon" />
+                                    <div className="upload-text">
+                                        <span className="primary-text">
+                                            Drag and drop your image here, or click to select
+                                        </span>
+                                        <span className="secondary-text">
+                                            Supported formats: JPG, PNG, HEIC (max 5MB)
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleFileChange}
+                                        accept="image/jpeg,image/png,image/heic"
+                                        className="file-input"
+                                        multiple
+                                    />
+                                </div>
+                            </>
+                        )}
 
-                    <Button
-                        type="submit"
-                        disabled={files.length === 0}
-                        className="w-full"
-                    >
-                        Check Compatibility
-                    </Button>
-                </form>
-            )}
-
-            {loading && (
-                <div className="analyzing-container">
-                    <div className="space-y-4">
-                        {previews.map((preview, index) => (
-                            <img 
-                                key={index}
-                                src={preview} 
-                                alt={`Analyzing ${index + 1}`}
-                                className="image-preview-large"
-                            />
-                        ))}
-                        <div className="analyzing-text">Analyzing your thermostat...</div>
-                        <div className="analyzing-bar"></div>
                     </div>
-                </div>
-            )}
+                );
+        }
+    };
+
+    return (
+        <div className="max-w-3xl mx-auto p-6">
+            <div className="text-center mb-8">
+                <h1 className="title">Check Your Thermostat Compatibility</h1>
+                <p className="subtitle">
+                    Upload a photo of your thermostat's wiring to see if it's compatible with Mysa in 3 easy steps.
+                </p>
+            </div>
+
+            {renderContent()}
 
             {error && (
-                <div className="p-4 text-sm text-destructive-foreground bg-destructive/10 rounded-lg">
-                    {error}
-                </div>
-            )}
-
-            {analysis && (
-                <div className="space-y-4">
-                    {previews.map((preview, index) => (
-                        <img 
-                            key={index}
-                            src={preview} 
-                            alt={`Analysis ${index + 1}`}
-                            className="image-preview-large"
-                        />
-                    ))}
-                    <div className="p-6 bg-card text-card-foreground rounded-lg shadow-sm">
-                        <h3 className="text-lg font-semibold">Analysis Results</h3>
-                        {analysis.results && analysis.results.map((result, index) => (
-                            <div key={index} className="space-y-4">
-                                {index > 0 && <hr className="border-t border-border" />}
-                                <div className="space-y-2">
-                                    <p><span className="font-medium">Thermostat Type:</span> {result.compatibility.thermostatType}</p>
-                                    <p><span className="font-medium">Compatibility:</span> {result.compatibility.compatibility}</p>
-                                    <p><span className="font-medium">Confidence:</span> {(result.compatibility.confidence * 100).toFixed(1)}%</p>
-                                </div>
-                                {result.compatibility.recommendations && (
-                                    <div className="space-y-2">
-                                        <h4 className="font-medium">Recommendations:</h4>
-                                        <ul className="list-disc list-inside space-y-1">
-                                            {result.compatibility.recommendations.map((rec, recIndex) => (
-                                                <li key={recIndex} className="text-sm text-muted-foreground">
-                                                    {rec}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-                                {result.summary && (
-                                    <div className="mt-4 pt-4 border-t border-border">
-                                        <h4 className="font-medium mb-2">Summary:</h4>
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                            {result.summary}
-                                        </p>
-                                    </div>
-                                )}
-                                {showDevInfo && (
-                                    <div className="mt-4 pt-4 border-t border-border">
-                                        <h4 className="font-medium mb-2">Raw Analysis:</h4>
-                                        <div className="text-sm bg-muted p-4 rounded-lg">
-                                            <pre className="whitespace-pre-wrap text-muted-foreground">
-                                                {result.analysis}
-                                            </pre>
-                                        </div>
-                                        <div className="mt-4">
-                                            <h5 className="font-medium mb-2">Debug Info:</h5>
-                                            <pre className="text-sm text-muted-foreground">
-                                                {JSON.stringify(result.debug, null, 2)}
-                                            </pre>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                <div className="error-container">
+                    <div className="error-message">
+                        {error}
                     </div>
-                    {showDevInfo && (
-                        <div className="mt-4 pt-4 border-t border-border">
-                            <h4 className="font-medium mb-2">Response Overview:</h4>
-                            <pre className="text-sm text-muted-foreground">
-                                Images Processed: {analysis.count}
-                                Total Processing Time: {analysis.totalProcessingTime}ms
-                            </pre>
-                        </div>
-                    )}
-                    <Button
-                        onClick={() => {
-                            setFiles([]);
-                            setPreviews([]);
-                            setAnalysis(null);
-                            setError(null);
-                        }}
-                        className="w-full"
-                    >
-                        Analyze Another Thermostat
-                    </Button>
                 </div>
             )}
         </div>

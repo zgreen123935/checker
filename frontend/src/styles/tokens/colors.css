@@ -1,0 +1,26 @@
+:root {
+  /* Primary colors */
+  --color-primary-50: #E6F7F1;
+  --color-primary-500: #027A48;
+  
+  /* Neutral colors */
+  --color-gray-50: #F9FAFB;
+  --color-gray-100: #F2F4F7;
+  --color-gray-200: #E4E7EC;
+  --color-gray-300: #D0D5DD;
+  --color-gray-400: #98A2B3;
+  --color-gray-500: #667085;
+  --color-gray-900: #101828;
+
+  /* Semantic colors */
+  --color-background: #FFFFFF;
+  --color-border: var(--color-gray-200);
+  --color-text-primary: var(--color-gray-900);
+  --color-text-secondary: var(--color-gray-500);
+  
+  /* Component-specific colors */
+  --step-indicator-bg: var(--color-primary-50);
+  --step-indicator-text: var(--color-gray-900);
+  --upload-area-border: var(--color-gray-200);
+  --upload-area-bg: var(--color-gray-50);
+}

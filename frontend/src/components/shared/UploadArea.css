@@ -1,0 +1,49 @@
+.upload-area {
+  flex: 1;
+  border: 1px dashed var(--upload-area-border);
+  border-radius: 12px;
+  padding: var(--spacing-3xl) var(--spacing-xl);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: var(--upload-area-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 360px;
+  gap: var(--spacing-xl);
+}
+
+.upload-area:hover {
+  background: var(--color-gray-50);
+  border-color: var(--color-gray-300);
+}
+
+.upload-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--color-gray-400);
+}
+
+.upload-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.primary-text {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.secondary-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.file-input {
+  display: none;
+}

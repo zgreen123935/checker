@@ -99,6 +99,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 └── README.md
 ```
 
+### Technical Notes
+
+### UI Architecture Overview
+
+The UI follows a component-based architecture with these key aspects:
+
+#### Component Structure
+- **Layout Components**
+  - `StepContainer`: Wraps each step with consistent padding and styling
+  - `ContentLayout`: Manages spacing between content elements
+  
+- **Shared Components**
+  - `Typography`: Reusable text components (Title, Description, StepIndicator)
+  - `UploadArea`: Handles file drag-and-drop and selection
+
+- **Step Components**
+  - `UploadStep`: First step for file selection
+  - `AnalysisStep`: Shows processing state
+  - `ResultsStep`: Displays compatibility results
+
+#### Design System Implementation
+- CSS custom properties for consistent:
+  - Spacing (4px base unit)
+  - Colors (semantic naming)
+  - Typography (responsive scaling)
+- Mobile-first responsive design
+- Accessibility-first approach
+
+#### State Flow
+1. User uploads image → triggers `handleFileSelect`
+2. App moves to analysis step → processes image
+3. Results displayed after analysis
+
+#### Key Technical Decisions
+- CSS Modules for style isolation
+- React hooks for state management
+- Lazy loading for performance
+- BEM naming for CSS clarity
+
 ### Fixed
 - Import path issues with shadcn/ui components
 - CSS import configuration

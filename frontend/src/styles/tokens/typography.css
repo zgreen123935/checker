@@ -1,0 +1,32 @@
+:root {
+  /* Font sizes */
+  --font-size-xs: 0.875rem;
+  --font-size-sm: 1rem;
+  --font-size-md: 1.125rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  --font-size-3xl: 2.5rem;
+
+  /* Line heights */
+  --line-height-tight: 1.1;
+  --line-height-normal: 1.2;
+  --line-height-relaxed: 1.5;
+
+  /* Font weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Component-specific typography */
+  --title-size: var(--font-size-2xl);
+  --title-line-height: var(--line-height-normal);
+  --title-weight: var(--font-weight-semibold);
+  
+  --description-size: var(--font-size-md);
+  --description-line-height: var(--line-height-relaxed);
+  
+  --step-indicator-size: var(--font-size-xs);
+  --step-indicator-weight: var(--font-weight-medium);
+}
