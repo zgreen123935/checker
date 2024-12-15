@@ -222,52 +222,59 @@ const ImageUpload = () => {
             {analysis && (
                 <div className="space-y-4 p-6 bg-card text-card-foreground rounded-lg shadow-sm">
                     <h3 className="text-lg font-semibold">Analysis Results</h3>
-                    <div className="space-y-2">
-                        <p><span className="font-medium">Thermostat Type:</span> {analysis.thermostatType}</p>
-                        <p><span className="font-medium">Compatibility:</span> {analysis.compatibility}</p>
-                        <p><span className="font-medium">Confidence:</span> {(analysis.confidence * 100).toFixed(1)}%</p>
-                    </div>
-                    {analysis.recommendations && (
-                        <div className="space-y-2">
-                            <h4 className="font-medium">Recommendations:</h4>
-                            <ul className="list-disc list-inside space-y-1">
-                                {analysis.recommendations.map((rec, index) => (
-                                    <li key={index} className="text-sm text-muted-foreground">
-                                        {rec}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                    {analysis.fullAnalysis && (
-                        <div className="mt-4 pt-4 border-t border-border">
-                            <h4 className="font-medium mb-2">Detailed Analysis:</h4>
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {analysis.fullAnalysis}
-                            </p>
-                        </div>
-                    )}
-                    {showDevInfo && (
-                        <div className="mt-4 pt-4 border-t border-border">
-                            <h4 className="font-medium mb-2">Raw Analysis:</h4>
-                            <div className="space-y-4">
-                                {analysis.rawAnalyses?.map((raw, index) => (
-                                    <div key={index} className="text-sm bg-muted p-4 rounded-lg">
-                                        <h5 className="font-medium mb-2">Image {index + 1}</h5>
+                    {analysis.results && analysis.results.map((result, index) => (
+                        <div key={index} className="space-y-4">
+                            {index > 0 && <hr className="border-t border-border" />}
+                            <div className="space-y-2">
+                                <p><span className="font-medium">Thermostat Type:</span> {result.compatibility.thermostatType}</p>
+                                <p><span className="font-medium">Compatibility:</span> {result.compatibility.compatibility}</p>
+                                <p><span className="font-medium">Confidence:</span> {(result.compatibility.confidence * 100).toFixed(1)}%</p>
+                            </div>
+                            {result.compatibility.recommendations && (
+                                <div className="space-y-2">
+                                    <h4 className="font-medium">Recommendations:</h4>
+                                    <ul className="list-disc list-inside space-y-1">
+                                        {result.compatibility.recommendations.map((rec, recIndex) => (
+                                            <li key={recIndex} className="text-sm text-muted-foreground">
+                                                {rec}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {result.summary && (
+                                <div className="mt-4 pt-4 border-t border-border">
+                                    <h4 className="font-medium mb-2">Summary:</h4>
+                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                        {result.summary}
+                                    </p>
+                                </div>
+                            )}
+                            {showDevInfo && (
+                                <div className="mt-4 pt-4 border-t border-border">
+                                    <h4 className="font-medium mb-2">Raw Analysis:</h4>
+                                    <div className="text-sm bg-muted p-4 rounded-lg">
                                         <pre className="whitespace-pre-wrap text-muted-foreground">
-                                            {raw}
+                                            {result.analysis}
                                         </pre>
                                     </div>
-                                ))}
-                                {analysis.debug && (
                                     <div className="mt-4">
                                         <h5 className="font-medium mb-2">Debug Info:</h5>
                                         <pre className="text-sm text-muted-foreground">
-                                            {JSON.stringify(analysis.debug, null, 2)}
+                                            {JSON.stringify(result.debug, null, 2)}
                                         </pre>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    {showDevInfo && (
+                        <div className="mt-4 pt-4 border-t border-border">
+                            <h4 className="font-medium mb-2">Response Overview:</h4>
+                            <pre className="text-sm text-muted-foreground">
+                                Images Processed: {analysis.count}
+                                Total Processing Time: {analysis.totalProcessingTime}ms
+                            </pre>
                         </div>
                     )}
                 </div>
