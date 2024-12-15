@@ -1,10 +1,10 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
+require('dotenv').config();
 const { OpenAI } = require('openai');
 
 // Load prompts configuration
@@ -55,7 +55,7 @@ const openai = new OpenAI({
 const cleanupFiles = async (files) => {
     try {
         for (const file of files) {
-            await fs.unlink(file.path);
+            await fs.promises.unlink(file.path);
         }
     } catch (error) {
         console.error('Error cleaning up files:', error);
@@ -65,7 +65,7 @@ const cleanupFiles = async (files) => {
 // Version info endpoint
 app.get('/api/version', async (req, res) => {
     try {
-        const versionData = await fs.readFile(path.join(__dirname, '..', 'version.json'), 'utf8');
+        const versionData = await fs.promises.readFile(path.join(__dirname, '..', 'version.json'), 'utf8');
         res.json(JSON.parse(versionData));
     } catch (error) {
         res.status(500).json({ error: 'Could not read version info' });
