@@ -74,85 +74,119 @@ app.get('/api/version', async (req, res) => {
 
 // Routes
 app.post('/api/analyze', upload.array('images', 5), async (req, res) => {
+    const startTime = Date.now();
+    const files = req.files || [];
+    
     try {
-        const files = req.files;
-        if (!files || files.length === 0) {
-            return res.status(400).json({ error: 'No image files provided' });
+        const description = req.body.description;
+
+        if (!description && files.length === 0) {
+            return res.status(400).json({ error: 'No thermostat description or images provided' });
         }
 
-        // Process images with OpenAI Vision API
-        const imageAnalyses = await Promise.all(files.map(async (file) => {
-            // Read file buffer
-            const imageBuffer = await fs.promises.readFile(file.path);
-            const imageBase64 = imageBuffer.toString('base64');
-            
-            // Use prompts from config file
-            const messages = JSON.parse(JSON.stringify(prompts.imageAnalysis.messages));
-            messages[1].content[1].image_url.url = `data:${file.mimetype};base64,${imageBase64}`;
-
-            const response = await openai.chat.completions.create({
-                model: prompts.imageAnalysis.model,
-                messages: messages,
-                max_tokens: prompts.imageAnalysis.max_tokens
-            });
-
-            // Process results summary
-            const analysis = response.choices[0].message.content;
-            const summaryMessages = JSON.parse(JSON.stringify(prompts.resultsSummary.messages));
-            summaryMessages[1].content = analysis;
-
-            const summaryResponse = await openai.chat.completions.create({
-                model: prompts.resultsSummary.model,
-                messages: summaryMessages,
-                max_tokens: prompts.resultsSummary.max_tokens
-            });
-
-            const summary = summaryResponse.choices[0].message.content;
-
-            // Extract JSON from summary
-            let compatibilityData = {};
-            try {
-                const jsonMatch = summary.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                    compatibilityData = JSON.parse(jsonMatch[0]);
-                }
-            } catch (error) {
-                console.error('Error parsing compatibility JSON:', error);
-                compatibilityData = {
-                    thermostatType: "Unknown",
-                    compatibility: "Uncertain",
-                    confidence: 0,
-                    recommendations: ["Error processing results"]
-                };
+        // Process thermostat analysis with GPT-4
+        const messages = JSON.parse(JSON.stringify(prompts.imageAnalysis.messages));
+        
+        // Prepare the content array with the text description
+        const content = [
+            {
+                type: "text",
+                text: messages[1].content[0].text + `\n\nHere is the thermostat description:\n${description || "No text description provided."}`
             }
+        ];
 
-            return {
+        // Add image content if files are provided
+        if (files.length > 0) {
+            for (const file of files) {
+                const imageBase64 = await fs.promises.readFile(file.path, { encoding: 'base64' });
+                content.push({
+                    type: "image_url",
+                    image_url: {
+                        url: `data:${file.mimetype};base64,${imageBase64}`,
+                        detail: "high"
+                    }
+                });
+            }
+        }
+
+        // Update the messages content
+        messages[1].content = content;
+
+        // Get the analysis from GPT-4
+        const response = await openai.chat.completions.create({
+            model: prompts.imageAnalysis.model,
+            messages: messages,
+            max_tokens: prompts.imageAnalysis.max_tokens,
+            temperature: prompts.imageAnalysis.temperature
+        });
+
+        const analysis = response.choices[0].message.content;
+        
+        // Process results summary
+        const summaryMessages = JSON.parse(JSON.stringify(prompts.resultsSummary.messages));
+        summaryMessages.push({
+            role: "user",
+            content: `Please summarize this thermostat analysis in a clear, natural format. Focus on compatibility status, confidence level, and key recommendations:\n\n${analysis}`
+        });
+
+        const summaryResponse = await openai.chat.completions.create({
+            model: prompts.resultsSummary.model,
+            messages: summaryMessages,
+            max_tokens: prompts.resultsSummary.max_tokens,
+            temperature: prompts.resultsSummary.temperature
+        });
+
+        const summary = summaryResponse.choices[0].message.content;
+
+        // Clean up uploaded files
+        if (files.length > 0) {
+            await cleanupFiles(files);
+        }
+
+        // Extract compatibility information from the summary
+        const compatibilityInfo = {
+            thermostatType: summary.match(/type:?\s*([^.\\n]+)/i)?.[1]?.trim() || "Not specified",
+            compatibility: summary.toLowerCase().includes("not compatible") ? "Not Compatible" : 
+                         summary.toLowerCase().includes("compatible") ? "Compatible" : "Uncertain",
+            confidence: parseFloat(summary.match(/confidence.*?(\d+)/i)?.[1] || "0") / 100,
+            recommendations: summary.match(/recommendations?:?(.*?)(?:\n|$)/gi)?.map(r => 
+                r.replace(/recommendations?:?\s*/i, '').trim()
+            ).filter(Boolean) || []
+        };
+
+        res.json({
+            results: [{
                 analysis,
                 summary,
-                compatibility: compatibilityData,
+                compatibility: compatibilityInfo,
                 debug: {
                     timestamp: new Date().toISOString(),
                     model: prompts.imageAnalysis.model,
-                    processingTime: Date.now() - req.startTime
+                    processingTime: Date.now() - startTime,
+                    filesProcessed: files.length
                 }
-            };
-        }));
-
-        // Cleanup temporary files
-        await cleanupFiles(files);
-
-        res.json({
-            results: imageAnalyses,
-            count: imageAnalyses.length,
-            totalProcessingTime: Date.now() - req.startTime
+            }],
+            count: 1,
+            totalProcessingTime: Date.now() - startTime
         });
     } catch (error) {
-        console.error('Error analyzing images:', error);
-        // Cleanup files even if there's an error
-        if (req.files) {
-            await cleanupFiles(req.files);
+        console.error('Error analyzing thermostat:', error);
+        
+        // Clean up files if they exist
+        if (files.length > 0) {
+            await cleanupFiles(files);
         }
-        res.status(500).json({ error: 'Error analyzing images', details: error.message });
+
+        res.status(500).json({
+            error: 'Error analyzing thermostat',
+            details: error.message,
+            debug: {
+                timestamp: new Date().toISOString(),
+                model: prompts.imageAnalysis.model,
+                processingTime: Date.now() - startTime,
+                error: error.message
+            }
+        });
     }
 });
 

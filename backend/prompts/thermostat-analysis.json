@@ -1,23 +1,37 @@
 {
     "imageAnalysis": {
-        "model": "gpt-4-turbo",
+        "model": "gpt-4o-2024-11-20",
         "messages": [
             {
                 "role": "system",
-                "content": "You are a technical assistant proficient in HVAC systems and smart thermostat compatibility. Your task is to analyze thermostat images and determine compatibility with Mysa's 24V smart thermostat."
+                "content": "You are a technical assistant proficient in HVAC systems and smart thermostat compatibility. Your task is to analyze thermostat images and descriptions to determine compatibility with Mysa's 24V smart thermostat."
             },
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": "Analyze this thermostat image in detail. Please provide:\n1. A detailed description of the visible components, including:\n   - Wiring terminals and connected wires (labels and colors)\n   - Display features\n   - Model indicators or identifying marks\n2. Identify the specific type or model of the thermostat, if possible.\n3. Assess compatibility with Mysa's 24V smart thermostat.\n4. State your confidence level in this assessment (0-100%).\n5. Highlight key installation considerations or potential issues.\n\n**Guidance for Analysis:**\n\n**Step 1: Identify Thermostat Wiring**\n- Remove the thermostat cover to inspect wiring terminals.\n- Note terminal labels and corresponding wire colors (e.g., R, Rc, Rh, W1, W2, Y1, Y2, C, G, O/B).\n- Count the number of connected wires and their respective terminals.\n\n**Step 2: Confirm System Voltage**\n- Verify that the system operates on 24V (low voltage) by checking the HVAC system's control board or user manual.\n- Identify wire types: thin, multicolored wires indicate low voltage; thicker wires (black or red) suggest high voltage (120V/240V).\n\n**Step 3: Check for a Common (C) Wire**\n- Look for a wire connected to the terminal labeled 'C', which provides continuous power for smart thermostats.\n- If absent, consider the feasibility of adding a C wire or using a Mysa Power Adapter (if available).\n\n**Step 4: Identify HVAC System Type**\n- Determine if the system is:\n  - Conventional (Forced Air): single- or multi-stage heating/cooling.\n  - Heat Pump: utilizes a reversing valve for heating and cooling; presence of O or B wire.\n- Note additional accessories such as humidifiers, dehumidifiers, or ventilators.\n- Assess the number of heating and cooling stages, typically indicated by W1, W2 (heating) and Y1, Y2 (cooling) terminals."
-                    },
+                        "text": "Analyze this thermostat in detail. Please provide:\n1. A detailed description of the visible components, including:\n   - Wiring terminals and connected wires (labels and colors)\n   - Display features\n   - Model indicators or identifying marks\n2. Identify the specific type or model of the thermostat, if possible.\n3. Assess compatibility with Mysa's 24V smart thermostat.\n4. State your confidence level in this assessment (0-100%).\n5. Highlight key installation considerations or potential issues.\n\n**Guidance for Analysis:**\n\n**Step 1: Identify Thermostat Wiring**\n- Look for wiring terminals and note their labels (e.g., R, Rc, Rh, W1, W2, Y1, Y2, C, G, O/B)\n- Note wire colors and their connections\n- Count the number of connected wires\n\n**Step 2: Confirm System Voltage**\n- Look for voltage indicators (24V vs 120V/240V)\n- Check wire thickness (thin wires indicate 24V, thick wires suggest high voltage)\n\n**Step 3: Check for Common Wire**\n- Look for a 'C' wire terminal and connection\n- Note if C-wire is present or if alternative power methods might be needed\n\n**Step 4: Identify System Type**\n- Look for indicators of:\n  - Conventional heating/cooling (W1/W2, Y1/Y2)\n  - Heat pump systems (O/B terminal)\n  - Additional features (humidifier, ventilation)"
+                    }
+                ]
+            }
+        ],
+        "max_tokens": 1000,
+        "temperature": 0.7
+    },
+    "textAnalysis": {
+        "model": "gpt-4o-2024-11-20",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a technical assistant proficient in HVAC systems and smart thermostat compatibility. Your task is to analyze thermostat descriptions to determine compatibility with Mysa's 24V smart thermostat."
+            },
+            {
+                "role": "user",
+                "content": [
                     {
-                        "type": "image",
-                        "image_url": {
-                            "url": "IMAGE_BASE64_PLACEHOLDER"
-                        }
+                        "type": "text",
+                        "text": "Analyze this thermostat description in detail. Please provide:\n1. A detailed description of the visible components, including:\n   - Wiring terminals and connected wires (labels and colors)\n   - Display features\n   - Model indicators or identifying marks\n2. Identify the specific type or model of the thermostat, if possible.\n3. Assess compatibility with Mysa's 24V smart thermostat.\n4. State your confidence level in this assessment (0-100%).\n5. Highlight key installation considerations or potential issues.\n\n**Guidance for Analysis:**\n\n**Step 1: Identify Thermostat Wiring**\n- Remove the thermostat cover to inspect wiring terminals.\n- Note terminal labels and corresponding wire colors (e.g., R, Rc, Rh, W1, W2, Y1, Y2, C, G, O/B).\n- Count the number of connected wires and their respective terminals.\n\n**Step 2: Confirm System Voltage**\n- Verify that the system operates on 24V (low voltage) by checking the HVAC system's control board or user manual.\n- Identify wire types: thin, multicolored wires indicate low voltage; thicker wires (black or red) suggest high voltage (120V/240V).\n\n**Step 3: Check for a Common (C) Wire**\n- Look for a wire connected to the terminal labeled 'C', which provides continuous power for smart thermostats.\n- If absent, consider the feasibility of adding a C wire or using a Mysa Power Adapter (if available).\n\n**Step 4: Identify HVAC System Type**\n- Determine if the system is:\n  - Conventional (Forced Air): single- or multi-stage heating/cooling.\n  - Heat Pump: utilizes a reversing valve for heating and cooling; presence of O or B wire.\n- Note additional accessories such as humidifiers, dehumidifiers, or ventilators.\n- Assess the number of heating and cooling stages, typically indicated by W1, W2 (heating) and Y1, Y2 (cooling) terminals."
                     }
                 ]
             }
@@ -25,35 +39,21 @@
         "max_tokens": 1000
     },
     "resultsSummary": {
-        "model": "gpt-4",
+        "model": "gpt-4o-2024-11-20",
         "messages": [
             {
                 "role": "system",
-                "content": "You are a technical assistant that summarizes thermostat compatibility analyses. Provide a natural language explanation followed by a JSON summary. The JSON should follow this structure (use double quotes):\n{\n    \"thermostatType\": \"specific model/type\",\n    \"compatibility\": \"Compatible/Not Compatible/Uncertain\",\n    \"confidence\": 0.95,\n    \"recommendations\": [\"recommendation 1\", \"recommendation 2\"]\n}"
-            },
-            {
-                "role": "user",
-                "content": "ANALYSIS_TEXT_PLACEHOLDER"
+                "content": "You are a technical assistant that summarizes thermostat compatibility analysis results in a clear, concise format."
             }
         ],
-        "max_tokens": 1000
+        "max_tokens": 500,
+        "temperature": 0.5
     },
-    "compatibilityGuidelines": {
-        "requirements": [
-            "24V system (C-wire recommended)",
-            "2-stage heating maximum",
-            "2-stage cooling maximum",
-            "Compatible with conventional forced air and heat pump systems",
-            "Not compatible with line voltage (120V/240V) systems",
-            "Not compatible with proprietary systems"
-        ],
-        "supportedSystemTypes": [
-            "Conventional 24V forced air systems",
-            "Heat pump systems",
-            "Gas furnaces",
-            "Electric furnaces",
-            "Boilers (with 24V control)",
-            "Central air conditioning"
+    "compatibilityGuide": {
+        "requiredComponents": [
+            "24V power system",
+            "Compatible wiring configuration",
+            "Sufficient wire terminals"
         ],
         "wiringConfiguration": [
             "R - Power (24V)",
