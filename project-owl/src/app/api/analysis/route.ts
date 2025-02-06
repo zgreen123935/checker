@@ -20,6 +20,11 @@ export async function GET(request: Request) {
     const recap = await generateDailyRecap(messages);
     console.log('Daily recap result:', JSON.stringify(recap, null, 2));
 
+    // Check if we have action items in the highlights
+    if (recap.highlights) {
+      console.log('Action items in highlights:', recap.highlights.map(h => h.actionItems));
+    }
+
     return NextResponse.json(recap);
   } catch (error) {
     console.error('Error in analysis route:', error);

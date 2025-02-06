@@ -60,66 +60,87 @@ function parseAnalysisData(data: any) {
 
 export default function ChannelsPage() {
   const [channels, setChannels] = useState<ChannelSummary[]>([])
-  const [analysis, setAnalysis] = useState<ChannelAnalysis[]>([])
-  const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
+  const [selectedChannel, setSelectedChannel] = useState<ChannelSummary | null>(null)
   const [selectedChannelAnalysis, setSelectedChannelAnalysis] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [view, setView] = useState<'recap' | 'tasks' | 'risks'>('recap')
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [channelsResponse, analysisResponse] = await Promise.all([
-          fetch('/api/channels'),
-          fetch('/api/analysis')
-        ])
-
-        const channelsData = await channelsResponse.json()
-        const analysisData = await analysisResponse.json()
-        
-        console.log('Analysis Data:', analysisData)
-        console.log('Analysis Data Type:', typeof analysisData)
-        console.log('Is Array:', Array.isArray(analysisData))
-        
-        // Ensure analysisData is an array
-        const analysisArray = Array.isArray(analysisData) ? analysisData : []
-        
-        setChannels(channelsData)
-        setAnalysis(analysisArray)
-
-        if (!selectedChannel && channelsData.length > 0) {
-          setSelectedChannel(channelsData[0].id)
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error)
-        setAnalysis([]) // Set empty array on error
-      } finally {
-        setIsRefreshing(false)
-      }
-    }
-
-    fetchData()
+    fetchChannels()
   }, [])
 
   useEffect(() => {
     if (selectedChannel) {
-      refreshAnalysis(selectedChannel)
+      refreshAnalysis(selectedChannel.id)
     }
   }, [selectedChannel])
+
+  const fetchChannels = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/channels')
+      const data = await response.json()
+      setChannels(data)
+      
+      // Only set initial channel if none is selected
+      if (!selectedChannel && data.length > 0) {
+        setSelectedChannel(data[0])
+      }
+    } catch (error) {
+      console.error('Error fetching channels:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const refreshAnalysis = async (channelId: string) => {
     try {
       setIsRefreshing(true)
-      console.log('Refreshing analysis for channel:', channelId);
+      console.log('Refreshing analysis for channel:', channelId)
       const response = await fetch(`/api/analysis?channelId=${channelId}`)
       const data = await response.json()
-      console.log('Analysis response:', data);
+      console.log('Analysis response:', data)
+      console.log('Action items in response:', data.highlights?.map((h: any) => h.actionItems))
       setSelectedChannelAnalysis(data)
     } catch (error) {
       console.error('Error refreshing analysis:', error)
     } finally {
       setIsRefreshing(false)
+    }
+  }
+
+  const postOwlToChannel = async (channelId: string) => {
+    try {
+      const response = await fetch('/api/post-owl', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ channelId }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to post owl emoji');
+      }
+      
+      console.log('Successfully posted owl to channel:', channelId);
+    } catch (error) {
+      console.error('Error posting owl:', error);
+    }
+  };
+
+  const postOwlToAllChannels = async () => {
+    for (const channel of channels) {
+      await postOwlToChannel(channel.id);
+    }
+  };
+
+  const handleChannelClick = (channel: ChannelSummary) => {
+    if (channel.id !== selectedChannel?.id) {
+      setSelectedChannel(channel)
+      setSelectedChannelAnalysis(null) // Clear previous analysis while loading new one
     }
   }
 
@@ -142,10 +163,10 @@ export default function ChannelsPage() {
             {channels.map(channel => (
               <button
                 key={channel.id}
-                onClick={() => setSelectedChannel(channel.id)}
+                onClick={() => handleChannelClick(channel)}
                 className={cn(
                   "w-full px-2 py-1.5 text-sm rounded-md text-left flex items-center gap-2 transition-colors",
-                  selectedChannel === channel.id
+                  selectedChannel === channel
                     ? "bg-primary/10 text-primary font-medium"
                     : "text-slate-700 hover:bg-slate-100"
                 )}
@@ -164,8 +185,8 @@ export default function ChannelsPage() {
         <header className="h-14 bg-white border-b flex items-center justify-between px-6 sticky top-0 z-10">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold text-slate-900">
-              {channels.find(c => c.id === selectedChannel)?.name ? 
-                `#${channels.find(c => c.id === selectedChannel)?.name}` : 
+              {selectedChannel?.name ? 
+                `#${selectedChannel.name}` : 
                 'Select a channel'}
             </h2>
             {selectedChannel && (
@@ -198,25 +219,35 @@ export default function ChannelsPage() {
             )}
           </div>
           {selectedChannel && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => refreshAnalysis(selectedChannel)}
-              disabled={isRefreshing}
-              className="text-sm"
-            >
-              {isRefreshing ? (
-                <>
-                  <ReloadIcon className="mr-2 h-3.5 w-3.5 animate-spin" />
-                  Refreshing...
-                </>
-              ) : (
-                <>
-                  <ReloadIcon className="mr-2 h-3.5 w-3.5" />
-                  Refresh Analysis
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => refreshAnalysis(selectedChannel.id)}
+                disabled={isRefreshing}
+                className="text-sm"
+              >
+                {isRefreshing ? (
+                  <>
+                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <ReloadIcon className="mr-2 h-4 w-4" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={postOwlToAllChannels}
+                className="text-sm"
+              >
+                🦉 Post Owl
+              </Button>
+            </div>
           )}
         </header>
 
@@ -316,36 +347,160 @@ export default function ChannelsPage() {
                 </div>
               ) : null}
 
-              {view === 'tasks' && selectedChannelAnalysis?.actionItems && (
-                <div className="max-w-4xl mx-auto space-y-6">
+              {view === 'tasks' && selectedChannelAnalysis?.highlights && (
+                <div className="max-w-6xl mx-auto space-y-6">
                   <div className="bg-white rounded-lg p-6 shadow-sm border">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Action Items</h3>
-                    {Array.isArray(selectedChannelAnalysis.actionItems) && selectedChannelAnalysis.actionItems.length > 0 ? (
-                      <ul className="list-disc pl-5 space-y-2 text-slate-700">
-                        {selectedChannelAnalysis.actionItems.map((task, index) => (
-                          <li key={index}>{task}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-slate-500">No action items found.</p>
-                    )}
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-slate-900">Action Items</h3>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-500">Status</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-500">Priority</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Task
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Priority
+                            </th>
+                            <th scope="col" className="relative px-6 py-3">
+                              <span className="sr-only">Actions</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {selectedChannelAnalysis.highlights.flatMap((highlight, highlightIndex) => 
+                            highlight.actionItems?.map((task, taskIndex) => (
+                              <tr key={`${highlightIndex}-${taskIndex}`} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-normal">
+                                  <div className="text-sm text-gray-900">{task}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {new Date(highlight.date).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric'
+                                    })}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    Todo
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    Medium
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <button className="text-gray-400 hover:text-gray-500">
+                                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                                    </svg>
+                                  </button>
+                                </td>
+                              </tr>
+                            )) ?? []
+                          )}
+                        </tbody>
+                      </table>
+                      
+                      {!selectedChannelAnalysis.highlights.some(h => h.actionItems?.length > 0) && (
+                        <div className="text-center py-8">
+                          <p className="text-slate-500">No action items found.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
 
-              {view === 'risks' && selectedChannelAnalysis?.risks && (
-                <div className="max-w-4xl mx-auto space-y-6">
+              {view === 'risks' && selectedChannelAnalysis?.highlights && (
+                <div className="max-w-6xl mx-auto space-y-6">
                   <div className="bg-white rounded-lg p-6 shadow-sm border">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Risks & Concerns</h3>
-                    {Array.isArray(selectedChannelAnalysis.risks) && selectedChannelAnalysis.risks.length > 0 ? (
-                      <ul className="list-disc pl-5 space-y-2 text-slate-700">
-                        {selectedChannelAnalysis.risks.map((risk, index) => (
-                          <li key={index}>{risk}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-slate-500">No risks found.</p>
-                    )}
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-slate-900">Risk Register</h3>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-500">Status</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-500">Impact</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Risk
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Impact
+                            </th>
+                            <th scope="col" className="relative px-6 py-3">
+                              <span className="sr-only">Actions</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {selectedChannelAnalysis.highlights.flatMap((highlight, highlightIndex) => 
+                            highlight.risks?.map((risk, riskIndex) => (
+                              <tr key={`${highlightIndex}-${riskIndex}`} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-normal">
+                                  <div className="text-sm text-gray-900">{risk}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {new Date(highlight.date).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric'
+                                    })}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Active
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                    High
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <button className="text-gray-400 hover:text-gray-500">
+                                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                                    </svg>
+                                  </button>
+                                </td>
+                              </tr>
+                            )) ?? []
+                          )}
+                        </tbody>
+                      </table>
+                      
+                      {!selectedChannelAnalysis.highlights.some(h => h.risks?.length > 0) && (
+                        <div className="text-center py-8">
+                          <p className="text-slate-500">No risks found.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

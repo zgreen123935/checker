@@ -162,11 +162,12 @@ ${messageContent}`,
 
 export async function extractActionItems(messages: ProcessedMessage[]): Promise<string[]> {
   try {
+    console.log('Extracting action items from messages:', messages.length);
     const completion = await openai.chat.completions.create({
       messages: [
         {
           role: "system",
-          content: `You are a helpful assistant that extracts action items and tasks from Slack messages. When referring to users, use their username (prefixed with @). Return the list as a JSON array of strings.`,
+          content: `You are a helpful assistant that extracts action items and tasks from Slack messages. When referring to users, use their username (prefixed with @). Return the list as a JSON array of strings. Look for tasks that are assigned, mentioned, or implied in the conversation.`,
         },
         {
           role: "user",
@@ -179,7 +180,10 @@ ${JSON.stringify(messages)}`,
     });
 
     const content = completion.choices[0].message.content || '[]';
-    return JSON.parse(content);
+    console.log('OpenAI response for action items:', content);
+    const actionItems = JSON.parse(content);
+    console.log('Parsed action items:', actionItems);
+    return actionItems;
   } catch (error) {
     console.error('Error extracting action items:', error);
     return [];

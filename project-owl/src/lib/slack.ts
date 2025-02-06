@@ -82,3 +82,16 @@ export async function postMessage(channelId: string, text: string) {
     throw error
   }
 }
+
+export async function postOwlEmoji(channelId: string) {
+  try {
+    await slack.chat.postMessage({
+      channel: channelId,
+      text: "🦉",
+    });
+    console.log('Posted owl emoji to channel:', channelId);
+  } catch (error) {
+    console.error('Error posting owl emoji:', error);
+    throw error;
+  }
+}
