@@ -3,18 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { ReloadIcon, Spinner } from '@/components/ui/icons'
-
-interface Message {
-  ts: string
-  text: string
-  user?: string
-  username?: string
-  real_name?: string
-  thread_ts?: string
-  reply_count?: number
-}
+import { cn } from '@/lib/utils'
+import Image from 'next/image'
 
 interface ChannelSummary {
   id: string
@@ -23,7 +14,15 @@ interface ChannelSummary {
   lastUpdated: Date
   analysisId: string | null
   error?: string
-  messages: Message[]
+  messages: {
+    ts: string
+    text: string
+    user?: string
+    username?: string
+    real_name?: string
+    thread_ts?: string
+    reply_count?: number
+  }[]
 }
 
 interface ChannelAnalysis {
@@ -33,8 +32,8 @@ interface ChannelAnalysis {
   decisions: string[]
   progress: string[]
   questions: string[]
-  actionItems: any[]
-  risks: any[]
+  actionItems: string[]
+  risks: string[]
   lastUpdated: Date
 }
 
@@ -45,6 +44,7 @@ interface Highlight {
   progress: string[]
   questions: string[]
   actionItems: string[]
+  risks: string[]
 }
 
 function parseAnalysisData(data: any) {
@@ -62,12 +62,13 @@ export default function ChannelsPage() {
   const [channels, setChannels] = useState<ChannelSummary[]>([])
   const [analysis, setAnalysis] = useState<ChannelAnalysis[]>([])
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
-  const [view, setView] = useState<'recap' | 'tasks' | 'risks'>('recap')
+  const [selectedChannelAnalysis, setSelectedChannelAnalysis] = useState<any>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [view, setView] = useState<'recap' | 'tasks' | 'risks'>('recap')
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    const fetchData = async () => {
+    async function fetchData() {
       try {
         const [channelsResponse, analysisResponse] = await Promise.all([
           fetch('/api/channels'),
@@ -101,27 +102,20 @@ export default function ChannelsPage() {
     fetchData()
   }, [])
 
-  const selectedChannelAnalysis = analysis.find(a => a.channelId === selectedChannel)
+  useEffect(() => {
+    if (selectedChannel) {
+      refreshAnalysis(selectedChannel)
+    }
+  }, [selectedChannel])
 
   const refreshAnalysis = async (channelId: string) => {
     try {
       setIsRefreshing(true)
-      const response = await fetch('/api/analysis/refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ channelId }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to refresh analysis')
-      }
-
-      const newAnalysis = await response.json()
-      setAnalysis(prev => prev.map(a =>
-        a.channelId === channelId ? { ...a, ...newAnalysis } : a
-      ))
+      console.log('Refreshing analysis for channel:', channelId);
+      const response = await fetch(`/api/analysis?channelId=${channelId}`)
+      const data = await response.json()
+      console.log('Analysis response:', data);
+      setSelectedChannelAnalysis(data)
     } catch (error) {
       console.error('Error refreshing analysis:', error)
     } finally {
@@ -134,6 +128,13 @@ export default function ChannelsPage() {
       {/* Sidebar */}
       <div className="w-64 flex-shrink-0 border-r bg-white">
         <div className="h-14 border-b flex items-center px-4">
+          <Image 
+            src="/owl-icon.png" 
+            alt="Project Owl" 
+            width={24} 
+            height={24} 
+            className="mr-2"
+          />
           <h1 className="text-lg font-semibold text-slate-900">Project Owl</h1>
         </div>
         <div className="p-2">
@@ -237,9 +238,10 @@ export default function ChannelsPage() {
             </div>
           ) : (
             <div className="px-6 py-6">
-              {view === 'recap' && selectedChannelAnalysis?.highlights && (
+              {view === 'recap' && selectedChannelAnalysis?.highlights ? (
                 <div className="space-y-6 max-w-4xl mx-auto">
-                  {selectedChannelAnalysis.highlights.map((highlight) => (
+                  {console.log('Rendering highlights:', selectedChannelAnalysis.highlights)}
+                  {selectedChannelAnalysis.highlights.map((highlight: Highlight) => (
                     <div key={highlight.date} className="bg-white rounded-lg p-6 shadow-sm border space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-slate-900">
@@ -298,200 +300,53 @@ export default function ChannelsPage() {
                           </ul>
                         </div>
                       )}
+
+                      {highlight.risks.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-2">Risks & Concerns</h4>
+                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
+                            {highlight.risks.map((risk, i) => (
+                              <li key={i}>{risk}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
 
               {view === 'tasks' && selectedChannelAnalysis?.actionItems && (
-                <div className="max-w-6xl mx-auto space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-semibold">Welcome back!</h2>
-                      <p className="text-muted-foreground">Here's a list of your tasks for this month!</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <input 
-                          type="text" 
-                          placeholder="Filter tasks..." 
-                          className="px-3 py-1 text-sm border rounded-md"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button className="inline-flex items-center gap-1 px-2 py-1 text-sm border rounded-md">
-                          <span>Status</span>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        <button className="inline-flex items-center gap-1 px-2 py-1 text-sm border rounded-md">
-                          <span>Priority</span>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        <button className="inline-flex items-center gap-1 px-2 py-1 text-sm border rounded-md">
-                          <span>View</span>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-card rounded-lg border shadow-sm">
-                    <div className="p-4">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="text-sm text-muted-foreground">
-                            <th className="w-[40px] text-left pl-2">
-                              <input type="checkbox" className="rounded border-muted" />
-                            </th>
-                            <th className="font-medium text-left">Task</th>
-                            <th className="w-[120px] font-medium text-left">Status</th>
-                            <th className="w-[120px] font-medium text-left">Priority</th>
-                            <th className="w-[40px]"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-sm">
-                          {Array.isArray(selectedChannelAnalysis.actionItems) 
-                            ? selectedChannelAnalysis.actionItems.map((task, index) => (
-                                <tr key={index} className="border-t hover:bg-muted/50">
-                                  <td className="py-3 pl-2">
-                                    <input type="checkbox" className="rounded border-muted" />
-                                  </td>
-                                  <td className="py-3">
-                                    <div className="font-medium">{task.description}</div>
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                      {task.assignee} {task.dueDate && `• Due ${new Date(task.dueDate).toLocaleDateString()}`}
-                                    </div>
-                                  </td>
-                                  <td className="py-3">
-                                    <div className={cn(
-                                      "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
-                                      task.status === 'completed' ? "bg-green-100 text-green-800" :
-                                        task.status === 'in_progress' ? "bg-blue-100 text-blue-800" :
-                                          task.status === 'cancelled' ? "bg-gray-100 text-gray-800" :
-                                            "bg-secondary text-secondary-foreground"
-                                    )}>
-                                      <span className={cn(
-                                        "w-1.5 h-1.5 rounded-full",
-                                        task.status === 'completed' ? "bg-green-500" :
-                                          task.status === 'in_progress' ? "bg-blue-500" :
-                                            task.status === 'cancelled' ? "bg-gray-500" :
-                                              "bg-secondary-foreground"
-                                      )} />
-                                      {task.status?.replace('_', ' ') || 'pending'}
-                                    </div>
-                                  </td>
-                                  <td className="py-3">
-                                    <div className="inline-flex items-center gap-1">
-                                      <svg className={cn(
-                                        "w-4 h-4",
-                                        task.priority === 'high' ? "text-destructive rotate-180" :
-                                          task.priority === 'low' ? "text-green-500" :
-                                            "text-yellow-500"
-                                      )} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
-                                      </svg>
-                                      <span className="text-sm">{task.priority}</span>
-                                    </div>
-                                  </td>
-                                  <td className="py-3 pr-4">
-                                    <button className="p-1 hover:bg-muted rounded-md">
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                                      </svg>
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))
-                            : null}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
-                      <div className="text-muted-foreground">
-                        0 of {selectedChannelAnalysis.actionItems?.length || 0} row(s) selected
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Rows per page</span>
-                        <select className="px-1 py-0.5 border rounded text-sm">
-                          <option>10</option>
-                          <option>20</option>
-                          <option>50</option>
-                        </select>
-                        <span className="text-muted-foreground">
-                          Page 1 of {Math.ceil((selectedChannelAnalysis.actionItems?.length || 0) / 10)}
-                        </span>
-                        <div className="flex items-center">
-                          <button className="p-1 hover:bg-muted rounded-md" disabled>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                            </svg>
-                          </button>
-                          <button className="p-1 hover:bg-muted rounded-md" disabled>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                          </button>
-                          <button className="p-1 hover:bg-muted rounded-md">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                          <button className="p-1 hover:bg-muted rounded-md">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                <div className="max-w-4xl mx-auto space-y-6">
+                  <div className="bg-white rounded-lg p-6 shadow-sm border">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Action Items</h3>
+                    {Array.isArray(selectedChannelAnalysis.actionItems) && selectedChannelAnalysis.actionItems.length > 0 ? (
+                      <ul className="list-disc pl-5 space-y-2 text-slate-700">
+                        {selectedChannelAnalysis.actionItems.map((task, index) => (
+                          <li key={index}>{task}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-slate-500">No action items found.</p>
+                    )}
                   </div>
                 </div>
               )}
 
               {view === 'risks' && selectedChannelAnalysis?.risks && (
-                <div className="max-w-4xl mx-auto space-y-4">
-                  {Array.isArray(selectedChannelAnalysis.risks)
-                    ? selectedChannelAnalysis.risks.map((risk, index) => (
-                        <div key={index} className="bg-card rounded-lg p-6 shadow-sm border hover:border-primary/50 transition-colors">
-                          <div className="flex items-start gap-4">
-                            <div className={cn(
-                              "w-1 h-full rounded-full flex-shrink-0",
-                              risk.severity === 'high' ? "bg-destructive" :
-                                risk.severity === 'medium' ? "bg-yellow-500" :
-                                  "bg-green-500"
-                            )} />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <h4 className="font-medium text-lg">{risk.description}</h4>
-                                <div className="flex gap-2">
-                                  <span className={cn(
-                                    "px-2 py-1 rounded-full text-xs font-medium",
-                                    risk.severity === 'high' ? "bg-red-100 text-red-800" :
-                                      risk.severity === 'medium' ? "bg-yellow-100 text-yellow-800" :
-                                        "bg-green-100 text-green-800"
-                                  )}>
-                                    {risk.severity}
-                                  </span>
-                                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    {risk.type}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="mt-3">
-                                <h5 className="font-medium text-sm mb-1">Suggested Action</h5>
-                                <p className="text-muted-foreground text-sm">{risk.suggestedAction}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    : null}
+                <div className="max-w-4xl mx-auto space-y-6">
+                  <div className="bg-white rounded-lg p-6 shadow-sm border">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Risks & Concerns</h3>
+                    {Array.isArray(selectedChannelAnalysis.risks) && selectedChannelAnalysis.risks.length > 0 ? (
+                      <ul className="list-disc pl-5 space-y-2 text-slate-700">
+                        {selectedChannelAnalysis.risks.map((risk, index) => (
+                          <li key={index}>{risk}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-slate-500">No risks found.</p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
