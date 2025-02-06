@@ -1,513 +1,487 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { ReloadIcon, Spinner } from '@/components/ui/icons'
-import { cn } from '@/lib/utils'
-import Image from 'next/image'
+import React from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { RotateCw, MoreHorizontal, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-interface ChannelSummary {
-  id: string
-  name: string
-  purpose: string
-  lastUpdated: Date
-  analysisId: string | null
-  error?: string
-  messages: {
-    ts: string
-    text: string
-    user?: string
-    username?: string
-    real_name?: string
-    thread_ts?: string
-    reply_count?: number
-  }[]
+interface Channel {
+  id: string;
+  name: string;
+  purpose?: string;
 }
 
-interface ChannelAnalysis {
-  id: string
-  channelId: string
-  summary: string | null
-  decisions: string[]
-  progress: string[]
-  questions: string[]
-  actionItems: string[]
-  risks: string[]
-  lastUpdated: Date
+type Priority = "Low" | "Medium" | "High";
+type Status = "Todo" | "In Progress" | "Done" | "Cancelled" | "Backlog";
+
+interface Task {
+  id: string;
+  type: "Documentation" | "Bug" | "Feature";
+  title: string;
+  status: Status;
+  priority: Priority;
 }
 
-interface Highlight {
-  date: string
-  summary: string
-  decisions: string[]
-  progress: string[]
-  questions: string[]
-  actionItems: string[]
-  risks: string[]
+interface Analysis {
+  id: string;
+  summary: string | null;
+  decisions: string[];
+  actionItems: Task[];
+  risks: string[];
+  lastUpdated: string;
 }
 
-function parseAnalysisData(data: any) {
-  if (typeof data === 'string' && data.startsWith('{')) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      return data;
-    }
-  }
-  return data;
-}
+const NAV_ITEMS = [
+  { id: 'daily-recap', label: 'Daily Recap' },
+  { id: 'tasks', label: 'Tasks', count: (analysis: Analysis | null) => analysis?.actionItems?.length ?? 0 },
+  { id: 'risks', label: 'Risks', count: (analysis: Analysis | null) => analysis?.risks?.length ?? 0 },
+  { id: 'decisions', label: 'Decisions', count: (analysis: Analysis | null) => analysis?.decisions?.length ?? 0 },
+];
+
+const statusIcons: Record<Status, React.ReactNode> = {
+  "Todo": <div className="h-2 w-2 rounded-full bg-gray-300" />,
+  "In Progress": <div className="h-2 w-2 rounded-full bg-blue-500" />,
+  "Done": <div className="h-2 w-2 rounded-full bg-green-500" />,
+  "Cancelled": <div className="h-2 w-2 rounded-full bg-red-500" />,
+  "Backlog": <div className="h-2 w-2 rounded-full bg-yellow-500" />,
+};
+
+const priorityIcons: Record<Priority, React.ReactNode> = {
+  "Low": <ArrowUpDown className="h-4 w-4 rotate-180 text-gray-500" />,
+  "Medium": <ArrowUpDown className="h-4 w-4 text-gray-500" />,
+  "High": <ArrowUpDown className="h-4 w-4 text-red-500" />,
+};
 
 export default function ChannelsPage() {
-  const [channels, setChannels] = useState<ChannelSummary[]>([])
-  const [selectedChannel, setSelectedChannel] = useState<ChannelSummary | null>(null)
-  const [selectedChannelAnalysis, setSelectedChannelAnalysis] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [view, setView] = useState<'recap' | 'tasks' | 'risks'>('recap')
-  const searchParams = useSearchParams()
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('daily-recap');
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const searchParams = useSearchParams();
+  const selectedChannelId = searchParams.get('channel');
 
   useEffect(() => {
-    fetchChannels()
-  }, [])
+    fetchChannels();
+  }, []);
 
   useEffect(() => {
-    if (selectedChannel) {
-      refreshAnalysis(selectedChannel.id)
+    if (selectedChannelId) {
+      fetchAnalysis(selectedChannelId);
+    } else {
+      setAnalysis(null);
     }
-  }, [selectedChannel])
+  }, [selectedChannelId]);
 
   const fetchChannels = async () => {
     try {
-      setIsLoading(true)
-      const response = await fetch('/api/channels')
-      const data = await response.json()
-      setChannels(data)
-      
-      // Only set initial channel if none is selected
-      if (!selectedChannel && data.length > 0) {
-        setSelectedChannel(data[0])
-      }
-    } catch (error) {
-      console.error('Error fetching channels:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const refreshAnalysis = async (channelId: string) => {
-    try {
-      setIsRefreshing(true)
-      console.log('Refreshing analysis for channel:', channelId)
-      const response = await fetch(`/api/analysis?channelId=${channelId}`)
-      const data = await response.json()
-      console.log('Analysis response:', data)
-      console.log('Action items in response:', data.highlights?.map((h: any) => h.actionItems))
-      setSelectedChannelAnalysis(data)
-    } catch (error) {
-      console.error('Error refreshing analysis:', error)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
-
-  const postOwlToChannel = async (channelId: string) => {
-    try {
-      const response = await fetch('/api/post-owl', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ channelId }),
-      });
-      
+      setLoading(true);
+      setError(null);
+      const response = await fetch('/api/channels');
       if (!response.ok) {
-        throw new Error('Failed to post owl emoji');
+        throw new Error('Failed to fetch channels');
       }
-      
-      console.log('Successfully posted owl to channel:', channelId);
-    } catch (error) {
-      console.error('Error posting owl:', error);
+      const data = await response.json();
+      setChannels(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const postOwlToAllChannels = async () => {
-    for (const channel of channels) {
-      await postOwlToChannel(channel.id);
+  const fetchAnalysis = async (channelId: string) => {
+    try {
+      setAnalysisLoading(true);
+      const response = await fetch(`/api/channels/${channelId}/analysis`);
+      if (response.status === 404) {
+        // No analysis found for this channel yet
+        setAnalysis(null);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error('Failed to fetch analysis');
+      }
+      const data = await response.json();
+      setAnalysis(data);
+    } catch (err) {
+      console.error('Error fetching analysis:', err);
+      setAnalysis(null);
+    } finally {
+      setAnalysisLoading(false);
     }
   };
 
-  const handleChannelClick = (channel: ChannelSummary) => {
-    if (channel.id !== selectedChannel?.id) {
-      setSelectedChannel(channel)
-      setSelectedChannelAnalysis(null) // Clear previous analysis while loading new one
+  const renderDailyRecap = () => {
+    if (analysisLoading) {
+      return <div className="text-muted-foreground">Loading analysis...</div>;
     }
-  }
+
+    if (!analysis) {
+      return <div className="text-muted-foreground">No analysis available for this channel.</div>;
+    }
+
+    return (
+      <div>
+        {analysis.summary && (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">{analysis.summary}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderTasks = () => {
+    if (analysisLoading) {
+      return <div className="text-muted-foreground">Loading tasks...</div>;
+    }
+
+    if (!analysis?.actionItems?.length) {
+      return <div className="text-muted-foreground">No tasks found for this channel.</div>;
+    }
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const paginatedTasks = analysis.actionItems.slice(startIndex, endIndex);
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <input
+            className="flex h-8 w-[150px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="Filter tasks..."
+          />
+          <Button variant="outline" size="sm" className="h-8 px-2">
+            Status
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 px-2">
+            Priority
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 px-2 ml-auto">
+            View
+          </Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[30px]">
+                <Checkbox
+                  checked={selectedTasks.length === paginatedTasks.length}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedTasks(paginatedTasks.map(t => t.id));
+                    } else {
+                      setSelectedTasks([]);
+                    }
+                  }}
+                />
+              </TableHead>
+              <TableHead>Title</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Priority</TableHead>
+              <TableHead className="w-[30px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedTasks.map((task) => (
+              <TableRow key={task.id}>
+                <TableCell>
+                  <Checkbox
+                    checked={selectedTasks.includes(task.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedTasks([...selectedTasks, task.id]);
+                      } else {
+                        setSelectedTasks(selectedTasks.filter(id => id !== task.id));
+                      }
+                    }}
+                  />
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center">
+                    <Badge variant="outline" className="mr-2">
+                      {task.type}
+                    </Badge>
+                    {task.title}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {statusIcons[task.status]}
+                    <span className="text-sm">{task.status}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {priorityIcons[task.priority]}
+                    <span className="text-sm">{task.priority}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <div className="flex items-center justify-between space-x-2 py-4">
+          <div className="text-sm text-muted-foreground">
+            {selectedTasks.length} of {analysis.actionItems.length} row(s) selected.
+          </div>
+          <div className="flex items-center space-x-6 lg:space-x-8">
+            <div className="flex items-center space-x-2">
+              <p className="text-sm font-medium">Rows per page</p>
+              <select
+                className="h-8 w-[70px] rounded-md border border-input bg-transparent px-2 py-0.5 text-sm"
+                value={rowsPerPage}
+                onChange={(e) => setRowsPerPage(Number(e.target.value))}
+              >
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="40">40</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+            <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+              Page {currentPage} of {Math.ceil(analysis.actionItems.length / rowsPerPage)}
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >
+                <span className="sr-only">Go to first page</span>
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <span className="sr-only">Go to previous page</span>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(analysis.actionItems.length / rowsPerPage), p + 1))}
+                disabled={currentPage === Math.ceil(analysis.actionItems.length / rowsPerPage)}
+              >
+                <span className="sr-only">Go to next page</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setCurrentPage(Math.ceil(analysis.actionItems.length / rowsPerPage))}
+                disabled={currentPage === Math.ceil(analysis.actionItems.length / rowsPerPage)}
+              >
+                <span className="sr-only">Go to last page</span>
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderRisks = () => {
+    if (analysisLoading) {
+      return <div className="text-muted-foreground">Loading risks...</div>;
+    }
+
+    if (!analysis?.risks?.length) {
+      return <div className="text-muted-foreground">No risks identified for this channel.</div>;
+    }
+
+    return (
+      <div className="space-y-4">
+        {analysis.risks.map((risk, index) => (
+          <div key={index} className="flex flex-col space-y-2 rounded-lg border p-4">
+            <div className="flex items-start justify-between space-x-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium leading-none">{risk}</p>
+                <div className="flex items-center pt-2">
+                  <Badge variant="danger" className="text-xs">Risk</Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderDecisions = () => {
+    if (analysisLoading) {
+      return <div className="text-muted-foreground">Loading decisions...</div>;
+    }
+
+    if (!analysis?.decisions?.length) {
+      return <div className="text-muted-foreground">No decisions recorded for this channel.</div>;
+    }
+
+    return (
+      <div className="space-y-4">
+        {analysis.decisions.map((decision, index) => (
+          <div key={index} className="flex flex-col space-y-2 rounded-lg border p-4">
+            <div className="flex items-start justify-between space-x-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium leading-none">{decision}</p>
+                <div className="flex items-center pt-2">
+                  <Badge variant="success" className="text-xs">Decision</Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <div className="w-64 flex-shrink-0 border-r bg-white">
+      <div className="w-64 flex-shrink-0 border-r">
         <div className="h-14 border-b flex items-center px-4">
-          <Image 
-            src="/owl-icon.png" 
-            alt="Project Owl" 
-            width={24} 
-            height={24} 
-            className="mr-2"
-          />
-          <h1 className="text-lg font-semibold text-slate-900">Project Owl</h1>
+          <h2 className="text-sm font-medium">Channels</h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 ml-auto"
+            onClick={fetchChannels}
+            disabled={loading}
+          >
+            <RotateCw className={cn("h-4 w-4", loading && "animate-spin")} />
+          </Button>
         </div>
-        <div className="p-2">
-          <div className="space-y-0.5">
-            {channels.map(channel => (
-              <button
-                key={channel.id}
-                onClick={() => handleChannelClick(channel)}
-                className={cn(
-                  "w-full px-2 py-1.5 text-sm rounded-md text-left flex items-center gap-2 transition-colors",
-                  selectedChannel === channel
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-slate-700 hover:bg-slate-100"
-                )}
-              >
-                <span className="text-slate-400">#</span>
-                {channel.name}
-              </button>
-            ))}
-          </div>
+        <div className="overflow-y-auto h-[calc(100vh-3.5rem)]">
+          {error && (
+            <div className="p-4 text-sm text-red-500">
+              {error}
+            </div>
+          )}
+          {loading ? (
+            <div className="space-y-3 p-4">
+              <div className="h-10 bg-gray-100 animate-pulse rounded" />
+              <div className="h-10 bg-gray-100 animate-pulse rounded" />
+              <div className="h-10 bg-gray-100 animate-pulse rounded" />
+            </div>
+          ) : channels.length === 0 ? (
+            <div className="p-4 text-muted-foreground">No channels found.</div>
+          ) : (
+            <div className="grid gap-2 p-4">
+              {channels.map((channel) => (
+                <a
+                  key={channel.id}
+                  href={`/channels?channel=${channel.id}`}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium",
+                    selectedChannelId === channel.id
+                      ? "bg-gray-100 text-gray-900"
+                      : "hover:bg-gray-100 hover:text-gray-900"
+                  )}
+                >
+                  # {channel.name}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
-        {/* Header */}
-        <header className="h-14 bg-white border-b flex items-center justify-between px-6 sticky top-0 z-10">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-slate-900">
-              {selectedChannel?.name ? 
-                `#${selectedChannel.name}` : 
-                'Select a channel'}
-            </h2>
-            {selectedChannel && (
-              <nav className="flex items-center gap-1">
-                <Button
-                  variant={view === 'recap' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setView('recap')}
-                  className="text-sm"
-                >
-                  Daily Recap
-                </Button>
-                <Button
-                  variant={view === 'tasks' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setView('tasks')}
-                  className="text-sm"
-                >
-                  Tasks
-                </Button>
-                <Button
-                  variant={view === 'risks' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setView('risks')}
-                  className="text-sm"
-                >
-                  Risks
-                </Button>
-              </nav>
-            )}
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto">
+        {selectedChannelId ? (
+          <div className="flex flex-col h-full">
+            <div className="h-14 border-b flex items-center px-4">
+              <div className="flex items-center space-x-1">
+                <h2 className="text-sm font-medium mr-6">
+                  #{channels.find(c => c.id === selectedChannelId)?.name}
+                </h2>
+                {NAV_ITEMS.map((item) => (
+                  <Button
+                    key={item.id}
+                    variant={activeTab === item.id ? "default" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-8 relative",
+                      activeTab === item.id
+                        ? "bg-[#0f172a] text-white hover:bg-[#0f172a]/90"
+                        : "hover:bg-transparent hover:text-foreground"
+                    )}
+                    onClick={() => setActiveTab(item.id)}
+                  >
+                    {item.label}
+                    {item.count && analysis && item.count(analysis) > 0 && (
+                      <Badge 
+                        variant="secondary" 
+                        className="ml-2 h-4 w-4 rounded-full p-0 text-xs font-medium"
+                      >
+                        {item.count(analysis)}
+                      </Badge>
+                    )}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="p-4">
+              {activeTab === 'daily-recap' && (
+                <div>
+                  <h3 className="text-sm font-medium mb-4">Summary</h3>
+                  {renderDailyRecap()}
+                </div>
+              )}
+              {activeTab === 'tasks' && (
+                <div>
+                  <h3 className="text-sm font-medium mb-4">Tasks</h3>
+                  {renderTasks()}
+                </div>
+              )}
+              {activeTab === 'risks' && (
+                <div>
+                  <h3 className="text-sm font-medium mb-4">Risks</h3>
+                  {renderRisks()}
+                </div>
+              )}
+              {activeTab === 'decisions' && (
+                <div>
+                  <h3 className="text-sm font-medium mb-4">Decisions</h3>
+                  {renderDecisions()}
+                </div>
+              )}
+            </div>
           </div>
-          {selectedChannel && (
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => refreshAnalysis(selectedChannel.id)}
-                disabled={isRefreshing}
-                className="text-sm"
-              >
-                {isRefreshing ? (
-                  <>
-                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                    Refreshing...
-                  </>
-                ) : (
-                  <>
-                    <ReloadIcon className="mr-2 h-4 w-4" />
-                    Refresh
-                  </>
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={postOwlToAllChannels}
-                className="text-sm"
-              >
-                🦉 Post Owl
-              </Button>
-            </div>
-          )}
-        </header>
-
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto">
-          {!selectedChannel ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center space-y-2">
-                <h3 className="text-lg font-medium text-slate-900">Welcome to Project Owl</h3>
-                <p className="text-slate-500">Select a channel to view its analysis</p>
-              </div>
-            </div>
-          ) : !selectedChannelAnalysis ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center space-y-2">
-                <Spinner className="h-8 w-8 animate-spin text-primary/40" />
-                <p className="text-slate-500">Loading channel analysis...</p>
-              </div>
-            </div>
-          ) : (
-            <div className="px-6 py-6">
-              {view === 'recap' && selectedChannelAnalysis?.highlights ? (
-                <div className="space-y-6 max-w-4xl mx-auto">
-                  {console.log('Rendering highlights:', selectedChannelAnalysis.highlights)}
-                  {selectedChannelAnalysis.highlights.map((highlight: Highlight) => (
-                    <div key={highlight.date} className="bg-white rounded-lg p-6 shadow-sm border space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-slate-900">
-                          {new Date(highlight.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </h3>
-                      </div>
-                      
-                      <div className="prose prose-slate max-w-none">
-                        <p>{highlight.summary}</p>
-                      </div>
-
-                      {highlight.decisions.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-slate-900 mb-2">Decisions Made</h4>
-                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
-                            {highlight.decisions.map((decision, i) => (
-                              <li key={i}>{decision}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {highlight.progress.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-slate-900 mb-2">Progress Updates</h4>
-                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
-                            {highlight.progress.map((update, i) => (
-                              <li key={i}>{update}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {highlight.questions.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-slate-900 mb-2">Open Questions</h4>
-                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
-                            {highlight.questions.map((question, i) => (
-                              <li key={i}>{question}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {highlight.actionItems.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-slate-900 mb-2">Action Items</h4>
-                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
-                            {highlight.actionItems.map((item, i) => (
-                              <li key={i}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {highlight.risks.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-slate-900 mb-2">Risks & Concerns</h4>
-                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
-                            {highlight.risks.map((risk, i) => (
-                              <li key={i}>{risk}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
-              {view === 'tasks' && selectedChannelAnalysis?.highlights && (
-                <div className="max-w-6xl mx-auto space-y-6">
-                  <div className="bg-white rounded-lg p-6 shadow-sm border">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-semibold text-slate-900">Action Items</h3>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-500">Status</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-500">Priority</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="overflow-hidden">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Task
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Priority
-                            </th>
-                            <th scope="col" className="relative px-6 py-3">
-                              <span className="sr-only">Actions</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {selectedChannelAnalysis.highlights.flatMap((highlight, highlightIndex) => 
-                            highlight.actionItems?.map((task, taskIndex) => (
-                              <tr key={`${highlightIndex}-${taskIndex}`} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-normal">
-                                  <div className="text-sm text-gray-900">{task}</div>
-                                  <div className="text-xs text-gray-500">
-                                    {new Date(highlight.date).toLocaleDateString('en-US', {
-                                      month: 'short',
-                                      day: 'numeric'
-                                    })}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                    Todo
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                    Medium
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                  <button className="text-gray-400 hover:text-gray-500">
-                                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                                    </svg>
-                                  </button>
-                                </td>
-                              </tr>
-                            )) ?? []
-                          )}
-                        </tbody>
-                      </table>
-                      
-                      {!selectedChannelAnalysis.highlights.some(h => h.actionItems?.length > 0) && (
-                        <div className="text-center py-8">
-                          <p className="text-slate-500">No action items found.</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {view === 'risks' && selectedChannelAnalysis?.highlights && (
-                <div className="max-w-6xl mx-auto space-y-6">
-                  <div className="bg-white rounded-lg p-6 shadow-sm border">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-semibold text-slate-900">Risk Register</h3>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-500">Status</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-500">Impact</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="overflow-hidden">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Risk
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Impact
-                            </th>
-                            <th scope="col" className="relative px-6 py-3">
-                              <span className="sr-only">Actions</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {selectedChannelAnalysis.highlights.flatMap((highlight, highlightIndex) => 
-                            highlight.risks?.map((risk, riskIndex) => (
-                              <tr key={`${highlightIndex}-${riskIndex}`} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-normal">
-                                  <div className="text-sm text-gray-900">{risk}</div>
-                                  <div className="text-xs text-gray-500">
-                                    {new Date(highlight.date).toLocaleDateString('en-US', {
-                                      month: 'short',
-                                      day: 'numeric'
-                                    })}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                    Active
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
-                                    High
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                  <button className="text-gray-400 hover:text-gray-500">
-                                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                                    </svg>
-                                  </button>
-                                </td>
-                              </tr>
-                            )) ?? []
-                          )}
-                        </tbody>
-                      </table>
-                      
-                      {!selectedChannelAnalysis.highlights.some(h => h.risks?.length > 0) && (
-                        <div className="text-center py-8">
-                          <p className="text-slate-500">No risks found.</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </main>
+        ) : (
+          <div className="p-6 text-center text-muted-foreground">
+            Select a channel from the sidebar
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }

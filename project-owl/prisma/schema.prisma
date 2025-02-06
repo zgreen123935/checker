@@ -9,11 +9,13 @@ generator client {
 }
 
 model Channel {
-  id          String    @id
+  id          String           @id
   name        String
   purpose     String?
-  lastUpdated DateTime  @default(now())
+  lastUpdated DateTime         @default(now())
   analysis    Analysis?
+  messages    SlackMessage[]
+  batches     MessageBatch[]
 }
 
 model Analysis {
@@ -22,11 +24,50 @@ model Analysis {
   channel     Channel  @relation(fields: [channelId], references: [id])
   summary     String?
   decisions   String[]
-  progress    String[]
-  questions   String[]
-  actionItems Json[]
-  risks       Json[]
+  actionItems String[]
+  risks       String[]
   lastUpdated DateTime @default(now())
+  batchId     String?  // The message batch this analysis was based on
+  batch       MessageBatch? @relation(fields: [batchId], references: [id])
+}
+
+model SlackUser {
+  id        String         @id  // Slack user ID
+  username  String
+  realName  String?
+  email     String?
+  updatedAt DateTime       @updatedAt
+  messages  SlackMessage[]
+}
+
+model SlackMessage {
+  id          String       @id @default(cuid())
+  ts          String      // Slack timestamp (used as message ID)
+  channelId   String
+  channel     Channel     @relation(fields: [channelId], references: [id])
+  userId      String
+  user        SlackUser   @relation(fields: [userId], references: [id])
+  text        String
+  threadTs    String?     // Parent thread timestamp if this is a reply
+  replyCount  Int?        // Number of replies if this is a parent message
+  rawJson     Json        // Store the complete raw message from Slack
+  batchId     String      // Group messages that were fetched together
+  batch       MessageBatch @relation(fields: [batchId], references: [id])
+  createdAt   DateTime    @default(now())
+
+  @@unique([channelId, ts]) // Ensure we don't store duplicate messages
+}
+
+model MessageBatch {
+  id          String         @id @default(cuid())
+  channelId   String
+  channel     Channel        @relation(fields: [channelId], references: [id])
+  messages    SlackMessage[]
+  analyses    Analysis[]
+  processedMessages Json    // Store the processed messages sent to OpenAI
+  startTime   DateTime      // Timestamp of oldest message in batch
+  endTime     DateTime      // Timestamp of newest message in batch
+  createdAt   DateTime      @default(now())
 }
 
 model Project {
@@ -43,21 +84,26 @@ model Insight {
   id          String   @id @default(cuid())
   projectId   String
   project     Project  @relation(fields: [projectId], references: [id])
-  recap       String
-  risks       String?
-  context     String?
+  date        DateTime
+  summary     String
+  decisions   String[]
+  progress    String[]
+  questions   String[]
+  actionItems String[]
+  risks       String[]
   createdAt   DateTime @default(now())
-  lastMessage DateTime
+  updatedAt   DateTime @updatedAt
 }
 
 model Task {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   projectId   String
-  project     Project   @relation(fields: [projectId], references: [id])
-  description String
+  project     Project  @relation(fields: [projectId], references: [id])
+  title       String
+  status      String   @default("open")
+  priority    String?
   assignee    String?
   dueDate     DateTime?
-  status      String    @default("open")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

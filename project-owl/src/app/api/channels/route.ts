@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { WebClient } from '@slack/web-api'
+import { prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 
 // Cache for user info to avoid repeated API calls
 const userCache = new Map<string, any>()
@@ -71,31 +73,117 @@ async function getChannelSummary(slack: WebClient, channelId: string) {
 
 export async function GET() {
   try {
+    // First check database connection
+    try {
+      await prisma.$connect()
+      console.log('Successfully connected to database')
+    } catch (error) {
+      console.error('Database connection error:', error)
+      return NextResponse.json(
+        { error: 'Failed to connect to database. Please check DATABASE_URL in .env' },
+        { status: 500 }
+      )
+    }
+
     const token = process.env.SLACK_BOT_TOKEN
     if (!token) {
-      throw new Error('SLACK_BOT_TOKEN is not set')
+      console.error('SLACK_BOT_TOKEN is not set')
+      return NextResponse.json(
+        { error: 'SLACK_BOT_TOKEN is not set in .env' },
+        { status: 500 }
+      )
     }
 
     const slack = new WebClient(token)
-    const projectChannels = process.env.PROJECT_CHANNELS || ''
+    console.log('Initialized Slack WebClient')
     
-    // Parse project channels from env var
-    const channelIds = projectChannels
-      .split(',')
-      .map(entry => entry.split('=')[1])
-      .filter(Boolean)
+    // Get channels from database
+    console.log('Fetching channels from database...')
+    const channels = await prisma.channel.findMany({
+      where: {},
+      select: {
+        id: true,
+        name: true,
+        purpose: true,
+        lastUpdated: true
+      }
+    })
+    
+    console.log('Raw database response:', JSON.stringify(channels, null, 2))
+    console.log(`Found ${channels.length} channels in database`)
+    
+    if (channels.length === 0) {
+      // If no channels in DB, try to get them from Slack
+      console.log('No channels in database, fetching from Slack...')
+      const result = await slack.conversations.list({
+        exclude_archived: true,
+        types: 'public_channel,private_channel'
+      })
+      
+      if (!result.ok || !result.channels) {
+        console.error('Failed to fetch channels from Slack')
+        return NextResponse.json(
+          { error: 'No channels found and failed to fetch from Slack' },
+          { status: 404 }
+        )
+      }
+      
+      // Store channels in database
+      console.log(`Found ${result.channels.length} channels from Slack, storing in database...`)
+      for (const channel of result.channels) {
+        if (channel.id && channel.name) {
+          await prisma.channel.upsert({
+            where: { id: channel.id },
+            create: {
+              id: channel.id,
+              name: channel.name,
+              purpose: channel.purpose?.value || '',
+            },
+            update: {
+              name: channel.name,
+              purpose: channel.purpose?.value || '',
+              lastUpdated: new Date(),
+            },
+          })
+        }
+      }
+      
+      // Fetch the newly stored channels
+      return NextResponse.json(await prisma.channel.findMany({
+        select: {
+          id: true,
+          name: true,
+          purpose: true,
+          lastUpdated: true
+        }
+      }))
+    }
 
     // Get summaries for all channels
+    console.log('Fetching channel summaries from Slack...')
     const channelSummaries = await Promise.all(
-      channelIds.map(channelId => getChannelSummary(slack, channelId))
+      channels.map(channel => getChannelSummary(slack, channel.id))
     )
+    console.log('Successfully fetched channel summaries')
 
     return NextResponse.json(channelSummaries)
   } catch (error: any) {
     console.error('Error in /api/channels:', error)
+    console.error('Error stack:', error.stack)
+    
+    // Handle Prisma errors specifically
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json(
+        { error: 'Database error: ' + error.message },
+        { status: 500 }
+      )
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
 }

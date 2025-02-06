@@ -1,9 +1,24 @@
 import { PrismaClient } from '@prisma/client'
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
+let prisma: PrismaClient
+
+if (process.env.NODE_ENV === 'production') {
+  prisma = new PrismaClient()
+} else {
+  if (!(global as any).prisma) {
+    (global as any).prisma = new PrismaClient()
+  }
+  prisma = (global as any).prisma
 }
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient()
+// Test the database connection
+prisma.$connect()
+  .then(() => {
+    console.log('Successfully connected to database')
+  })
+  .catch((error) => {
+    console.error('Failed to connect to database:', error)
+    process.exit(1)
+  })
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+export { prisma }
