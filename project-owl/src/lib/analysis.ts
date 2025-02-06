@@ -36,21 +36,22 @@ interface Risk {
 }
 
 export async function generateDailyRecap(messages: any[]): Promise<ChannelRecap> {
-  const prompt = `Analyze these Slack messages and create a daily recap. Focus on:
-1. Key decisions made
-2. Progress updates
-3. Unresolved questions or concerns
+  const messageContent = JSON.stringify(messages)
+  const prompt = `Here are today's Slack messages from the channel. Please generate a summary that includes:
+1. Key updates and progress
+2. Important decisions made
+3. Open questions or blockers
+4. Action items (if any)
 
-Provide a clear summary in plain text, and list out decisions, progress updates, and questions.
-
-Messages: ${JSON.stringify(messages)}`
+Messages:
+${messageContent}`
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4",
+    model: "o3-mini",
     messages: [
       {
         role: "system",
-        content: "You are a project management assistant analyzing Slack conversations. Be concise and factual. Always return a text summary and arrays of strings for decisions, progress, and questions."
+        content: "You are a helpful assistant that generates daily summaries from Slack messages. Focus on key updates, decisions, progress, and questions.",
       },
       {
         role: "user",
@@ -106,19 +107,23 @@ Messages: ${JSON.stringify(messages)}`
 }
 
 export async function extractActionItems(messages: any[]): Promise<ActionItem[]> {
-  const prompt = `Analyze these Slack messages and extract action items. For each action item, identify:
+  const messageContent = JSON.stringify(messages)
+  const prompt = `Here are Slack messages. Please identify any action items, tasks, or to-dos mentioned:
+
+${messageContent}
+
+For each action item found, provide:
 1. The task description
-2. Who it's assigned to
-3. Due date (if mentioned)
-4. Priority level based on context
-Messages: ${JSON.stringify(messages)}`
+2. Who it's assigned to (if specified)
+3. Due date (if specified)
+4. Priority/urgency (if specified)`
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4",
+    model: "o3-mini",
     messages: [
       {
         role: "system",
-        content: "You are a project management assistant extracting action items from Slack conversations."
+        content: "You are a helpful assistant that identifies action items from Slack messages.",
       },
       {
         role: "user",
@@ -166,20 +171,23 @@ Messages: ${JSON.stringify(messages)}`
 }
 
 export async function detectRisks(messages: any[]): Promise<Risk[]> {
-  const prompt = `Analyze these Slack messages and identify potential risks or blockers. Consider:
-1. Missed or at-risk deadlines
-2. Technical blockers
-3. Unclear requirements
-4. Resource constraints
-5. Repeated concerns
-Messages: ${JSON.stringify(messages)}`
+  const messageContent = JSON.stringify(messages)
+  const prompt = `Here are Slack messages. Please identify any potential risks, concerns, or issues mentioned:
+
+${messageContent}
+
+For each risk found, provide:
+1. Risk description
+2. Potential impact
+3. Suggested mitigation (if any was discussed)
+4. Status (active/resolved)`
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4",
+    model: "o3-mini",
     messages: [
       {
         role: "system",
-        content: "You are a project management assistant identifying risks and blockers in Slack conversations."
+        content: "You are a helpful assistant that identifies potential risks, concerns, or issues from Slack messages.",
       },
       {
         role: "user",
