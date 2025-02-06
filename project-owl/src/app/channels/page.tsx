@@ -38,6 +38,15 @@ interface ChannelAnalysis {
   lastUpdated: Date
 }
 
+interface Highlight {
+  date: string
+  summary: string
+  decisions: string[]
+  progress: string[]
+  questions: string[]
+  actionItems: string[]
+}
+
 function parseAnalysisData(data: any) {
   if (typeof data === 'string' && data.startsWith('{')) {
     try {
@@ -228,92 +237,69 @@ export default function ChannelsPage() {
             </div>
           ) : (
             <div className="px-6 py-6">
-              {view === 'recap' && selectedChannelAnalysis?.summary && (
+              {view === 'recap' && selectedChannelAnalysis?.highlights && (
                 <div className="space-y-6 max-w-4xl mx-auto">
-                  <div className="bg-card rounded-lg p-6 shadow-sm border">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-semibold">Daily Summary</h3>
-                      <span className="text-sm text-muted-foreground">
-                        {new Date().toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="prose prose-sm max-w-none">
-                      <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                        {(() => {
-                          const parsedData = parseAnalysisData(selectedChannelAnalysis.summary);
-                          return typeof parsedData === 'string' ? parsedData : parsedData.summary;
-                        })()}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-card rounded-lg p-6 shadow-sm border">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="h-5 w-1 bg-blue-500 rounded-full"></div>
-                        <h3 className="text-xl font-semibold">Key Decisions</h3>
+                  {selectedChannelAnalysis.highlights.map((highlight) => (
+                    <div key={highlight.date} className="bg-white rounded-lg p-6 shadow-sm border space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          {new Date(highlight.date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </h3>
                       </div>
-                      <ul className="space-y-3">
-                        {(() => {
-                          const parsedData = parseAnalysisData(selectedChannelAnalysis);
-                          const decisions = Array.isArray(parsedData.decisions) ? parsedData.decisions :
-                            Array.isArray(selectedChannelAnalysis.decisions) ? selectedChannelAnalysis.decisions : [];
-                          return decisions.map((decision, i) => (
-                            <li key={i} className="flex items-start gap-3">
-                              <span className="mt-1.5 h-1.5 w-1.5 bg-blue-500 rounded-full flex-shrink-0"></span>
-                              <span className="text-muted-foreground">
-                                {typeof decision === 'string' ? decision : JSON.stringify(decision)}
-                              </span>
-                            </li>
-                          ));
-                        })()}
-                      </ul>
-                    </div>
-
-                    <div className="bg-card rounded-lg p-6 shadow-sm border">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="h-5 w-1 bg-green-500 rounded-full"></div>
-                        <h3 className="text-xl font-semibold">Progress Updates</h3>
+                      
+                      <div className="prose prose-slate max-w-none">
+                        <p>{highlight.summary}</p>
                       </div>
-                      <ul className="space-y-3">
-                        {(() => {
-                          const parsedData = parseAnalysisData(selectedChannelAnalysis);
-                          const progress = Array.isArray(parsedData.progress) ? parsedData.progress :
-                            Array.isArray(selectedChannelAnalysis.progress) ? selectedChannelAnalysis.progress : [];
-                          return progress.map((item, i) => (
-                            <li key={i} className="flex items-start gap-3">
-                              <span className="mt-1.5 h-1.5 w-1.5 bg-green-500 rounded-full flex-shrink-0"></span>
-                              <span className="text-muted-foreground">
-                                {typeof item === 'string' ? item : JSON.stringify(item)}
-                              </span>
-                            </li>
-                          ));
-                        })()}
-                      </ul>
-                    </div>
 
-                    <div className="bg-card rounded-lg p-6 shadow-sm border md:col-span-2">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="h-5 w-1 bg-yellow-500 rounded-full"></div>
-                        <h3 className="text-xl font-semibold">Open Questions</h3>
-                      </div>
-                      <ul className="space-y-3">
-                        {(() => {
-                          const parsedData = parseAnalysisData(selectedChannelAnalysis);
-                          const questions = Array.isArray(parsedData.questions) ? parsedData.questions :
-                            Array.isArray(selectedChannelAnalysis.questions) ? selectedChannelAnalysis.questions : [];
-                          return questions.map((question, i) => (
-                            <li key={i} className="flex items-start gap-3">
-                              <span className="mt-1.5 h-1.5 w-1.5 bg-yellow-500 rounded-full flex-shrink-0"></span>
-                              <span className="text-muted-foreground">
-                                {typeof question === 'string' ? question : JSON.stringify(question)}
-                              </span>
-                            </li>
-                          ));
-                        })()}
-                      </ul>
+                      {highlight.decisions.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-2">Decisions Made</h4>
+                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
+                            {highlight.decisions.map((decision, i) => (
+                              <li key={i}>{decision}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {highlight.progress.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-2">Progress Updates</h4>
+                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
+                            {highlight.progress.map((update, i) => (
+                              <li key={i}>{update}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {highlight.questions.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-2">Open Questions</h4>
+                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
+                            {highlight.questions.map((question, i) => (
+                              <li key={i}>{question}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {highlight.actionItems.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-2">Action Items</h4>
+                          <ul className="list-disc pl-5 space-y-1 text-slate-700">
+                            {highlight.actionItems.map((item, i) => (
+                              <li key={i}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  ))}
                 </div>
               )}
 

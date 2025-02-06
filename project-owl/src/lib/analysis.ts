@@ -6,10 +6,17 @@ const openai = new OpenAI({
 })
 
 interface ChannelRecap {
-  summary: string
-  decisions: string[]
-  progress: string[]
-  questions: string[]
+  highlights: DailyHighlight[];
+  error?: string;
+}
+
+interface DailyHighlight {
+  date: string;
+  summary: string;
+  decisions: string[];
+  progress: string[];
+  questions: string[];
+  actionItems: string[];
 }
 
 interface ActionItem {
@@ -35,75 +42,81 @@ interface Risk {
   }[]
 }
 
+function groupMessagesByDay(messages: any[]): Record<string, any[]> {
+  const groupedMessages: Record<string, any[]> = {};
+  
+  messages.forEach(message => {
+    const date = new Date(parseInt(message.ts) * 1000).toISOString().split('T')[0];
+    if (!groupedMessages[date]) {
+      groupedMessages[date] = [];
+    }
+    groupedMessages[date].push(message);
+  });
+
+  return groupedMessages;
+}
+
 export async function generateDailyRecap(messages: any[]): Promise<ChannelRecap> {
-  const messageContent = JSON.stringify(messages)
-  const prompt = `Here are today's Slack messages from the channel. Please generate a summary that includes:
-1. Key updates and progress
-2. Important decisions made
-3. Open questions or blockers
-4. Action items (if any)
-
-Messages:
-${messageContent}`
-
-  const completion = await openai.chat.completions.create({
-    model: "o3-mini",
-    messages: [
-      {
-        role: "system",
-        content: "You are a helpful assistant that generates daily summaries from Slack messages. Focus on key updates, decisions, progress, and questions.",
-      },
-      {
-        role: "user",
-        content: prompt
-      }
-    ],
-    functions: [
-      {
-        name: "create_recap",
-        parameters: {
-          type: "object",
-          properties: {
-            summary: { 
-              type: "string",
-              description: "A plain text summary of the day's activities"
-            },
-            decisions: { 
-              type: "array", 
-              items: { type: "string" },
-              description: "List of key decisions made"
-            },
-            progress: { 
-              type: "array", 
-              items: { type: "string" },
-              description: "List of progress updates"
-            },
-            questions: { 
-              type: "array", 
-              items: { type: "string" },
-              description: "List of unresolved questions"
-            }
+  try {
+    const groupedMessages = groupMessagesByDay(messages);
+    const dates = Object.keys(groupedMessages).sort().reverse(); // Sort in reverse chronological order
+    
+    const highlights: DailyHighlight[] = [];
+    
+    for (const date of dates) {
+      const dayMessages = groupedMessages[date];
+      const messageContent = JSON.stringify(dayMessages);
+      
+      const completion = await openai.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: `You are a helpful assistant that generates daily summaries from Slack messages. Focus on key updates, decisions, progress, and questions. Format the output as a JSON object with the following structure:
+            {
+              "summary": "Brief overview of the day's key points",
+              "decisions": ["List of decisions made"],
+              "progress": ["List of progress updates"],
+              "questions": ["List of open questions"],
+              "actionItems": ["List of action items"]
+            }`,
           },
-          required: ["summary", "decisions", "progress", "questions"]
-        }
-      }
-    ],
-    function_call: { name: "create_recap" }
-  })
+          {
+            role: "user",
+            content: `Here are Slack messages from ${date}. Please generate a summary that captures the key points of the day:
 
-  const result = JSON.parse(completion.choices[0].message.function_call?.arguments || '{}')
-  
-  // Ensure the summary is a string
-  if (typeof result.summary !== 'string') {
-    result.summary = JSON.stringify(result.summary)
+${messageContent}`,
+          },
+        ],
+        model: "o3-mini",
+      });
+
+      const content = completion.choices[0].message.content || '';
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch (e) {
+        console.error('Error parsing OpenAI response:', e);
+        continue;
+      }
+
+      highlights.push({
+        date,
+        summary: parsed.summary || '',
+        decisions: parsed.decisions || [],
+        progress: parsed.progress || [],
+        questions: parsed.questions || [],
+        actionItems: parsed.actionItems || [],
+      });
+    }
+
+    return { highlights };
+  } catch (error) {
+    console.error('Error generating daily recap:', error);
+    return {
+      highlights: [],
+      error: 'Failed to generate daily recap'
+    };
   }
-  
-  // Ensure arrays contain only strings
-  result.decisions = (result.decisions || []).map(d => String(d))
-  result.progress = (result.progress || []).map(p => String(p))
-  result.questions = (result.questions || []).map(q => String(q))
-  
-  return result as ChannelRecap
 }
 
 export async function extractActionItems(messages: any[]): Promise<ActionItem[]> {

@@ -6,22 +6,22 @@ if (!process.env.SLACK_BOT_TOKEN) {
 
 export const slack = new WebClient(process.env.SLACK_BOT_TOKEN)
 
-export async function getChannelMessages(channelId: string, oldest?: string) {
+export async function getChannelMessages(channelId: string): Promise<any[]> {
   try {
+    // Get messages from the last 7 days
+    const oneWeekAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+    
     const result = await slack.conversations.history({
       channel: channelId,
-      limit: 100,
-      oldest,
-    })
+      limit: 100, // Increased limit to get more messages
+      oldest: oneWeekAgo.toString(),
+      inclusive: true
+    });
 
-    if (!result.ok) {
-      throw new Error(`Failed to fetch messages: ${result.error}`)
-    }
-
-    return result.messages || []
+    return result.messages || [];
   } catch (error) {
-    console.error('Error fetching channel messages:', error)
-    throw error
+    console.error('Error fetching channel messages:', error);
+    return [];
   }
 }
 
