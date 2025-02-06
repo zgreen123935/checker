@@ -1,0 +1,63 @@
+// This is your Prisma schema file
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Channel {
+  id          String    @id
+  name        String
+  purpose     String?
+  lastUpdated DateTime  @default(now())
+  analysis    Analysis?
+}
+
+model Analysis {
+  id          String   @id @default(cuid())
+  channelId   String   @unique
+  channel     Channel  @relation(fields: [channelId], references: [id])
+  summary     String?
+  decisions   String[]
+  progress    String[]
+  questions   String[]
+  actionItems Json[]
+  risks       Json[]
+  lastUpdated DateTime @default(now())
+}
+
+model Project {
+  id        String    @id @default(cuid())
+  name      String
+  channelId String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  insights  Insight[]
+  tasks     Task[]
+}
+
+model Insight {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  recap       String
+  risks       String?
+  context     String?
+  createdAt   DateTime @default(now())
+  lastMessage DateTime
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  description String
+  assignee    String?
+  dueDate     DateTime?
+  status      String    @default("open")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
