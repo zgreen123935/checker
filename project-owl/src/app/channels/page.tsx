@@ -66,6 +66,7 @@ const priorityIcons: Record<Priority, React.ReactNode> = {
 
 export default function ChannelsPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('daily-recap');
@@ -83,8 +84,10 @@ export default function ChannelsPage() {
 
   useEffect(() => {
     if (selectedChannelId) {
+      fetchChannelDetails(selectedChannelId);
       fetchAnalysis(selectedChannelId);
     } else {
+      setSelectedChannel(null);
       setAnalysis(null);
     }
   }, [selectedChannelId]);
@@ -94,15 +97,37 @@ export default function ChannelsPage() {
       setLoading(true);
       setError(null);
       const response = await fetch('/api/channels');
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch channels');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error?.message || 'Failed to fetch channels');
       }
+      
       const data = await response.json();
-      setChannels(data);
+      setChannels(data.channels || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error fetching channels:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchChannelDetails = async (channelId: string) => {
+    try {
+      const response = await fetch(`/api/channels/${channelId}/details`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Failed to fetch channel details');
+      }
+      
+      setSelectedChannel(data);
+    } catch (err) {
+      console.error('Error fetching channel details:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      }
     }
   };
 
@@ -110,19 +135,25 @@ export default function ChannelsPage() {
     try {
       setAnalysisLoading(true);
       const response = await fetch(`/api/channels/${channelId}/analysis`);
-      if (response.status === 404) {
-        // No analysis found for this channel yet
-        setAnalysis(null);
-        return;
-      }
-      if (!response.ok) {
-        throw new Error('Failed to fetch analysis');
-      }
       const data = await response.json();
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          // No analysis found is an expected case
+          setAnalysis(null);
+          return;
+        }
+        throw new Error(data.error?.message || 'Failed to fetch analysis');
+      }
+      
       setAnalysis(data);
     } catch (err) {
       console.error('Error fetching analysis:', err);
       setAnalysis(null);
+      // Only show error toast for non-404 errors
+      if (err instanceof Error && !err.message.includes('not found')) {
+        setError(err.message);
+      }
     } finally {
       setAnalysisLoading(false);
     }
@@ -421,7 +452,7 @@ export default function ChannelsPage() {
             <div className="h-14 border-b flex items-center px-4">
               <div className="flex items-center space-x-1">
                 <h2 className="text-sm font-medium mr-6">
-                  #{channels.find(c => c.id === selectedChannelId)?.name}
+                  #{selectedChannel?.name}
                 </h2>
                 {NAV_ITEMS.map((item) => (
                   <Button
